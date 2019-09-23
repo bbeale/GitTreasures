@@ -36,7 +36,7 @@ def hit_endpoint():
 @app.route('/git_treasures_dev')
 def hit_test_endpoint():
 
-    git_treasures.main_test()
+    git_treasures.dev()
 
     return redirect('index.html', code=302)
 
@@ -44,7 +44,7 @@ def hit_test_endpoint():
 @app.route('/git_treasures_testrail')
 def hit_testrail_endpoint():
 
-    git_treasures.main_testrail()
+    git_treasures.testrail_main()
 
     return redirect('index.html', code=302)
 
