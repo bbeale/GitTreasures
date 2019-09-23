@@ -24,19 +24,35 @@ These instructions are for integration with a GitLab hosted repository. GitHub i
 
 1) Clone repo wherever you want to use GitTreasures
 
-`git clone <repository>`
+`git clone https://github.com/bbeale/GitTreasures`
 
-2) Create `data/` inside `GitTreasures/`
+2) Initialize a virtual environment
+
+`python -m venv` (or set it up in PyCharm if deploying locally)
+
+... then activate it
+
+`source venv/bin/activate`
+
+3) Install dependencies
+
+`pip install -r requirements.txt`
+
+4) Create `data/` inside `GitTreasures/`
 
 `cd GitTreasures/ && mkdir data`
 
-3) Copy `task_scripts/init.py` script to project root
+5) Copy `task_scripts/init.py` script to project root
 
 `cp task_scripts/init.py .`
 
-4) Run `init.py` to initialize the database with commit data
+6) Run `init.py` to initialize the database with commit data
 
 `cd ../ && python init.py`
+
+7) Deactivate virtual environment when finished
+
+`deactivate`
 
 **Endpoint**
 
