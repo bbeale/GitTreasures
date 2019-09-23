@@ -11,10 +11,10 @@ chardet==3.0.4
 Click==7.0
 colorama==0.3.9
 constantly==15.1.0
-cryptography==2.2.2
+cryptography==2.3
 cssselect==1.0.3
 defusedxml==0.5.0
-Django==2.1.1
+Django==2.1.11
 Flask==1.0.2
 gitdb2==2.0.4
 GitPython==2.1.11
@@ -22,7 +22,7 @@ hyperlink==18.0.0
 idna==2.7
 incremental==17.5.0
 itsdangerous==0.24
-Jinja2==2.10
+Jinja2==2.10.1
 jira==2.0.0
 kombu==4.2.1
 lxml==4.2.3
@@ -52,7 +52,7 @@ python-hglib==2.6.1
 python-taint==0.42
 pytz==2018.5
 queuelib==1.5.0
-requests==2.19.1
+requests==2.20.0
 requests-oauthlib==1.0.0
 requests-toolbelt==0.8.0
 Scrapy==1.5.0
@@ -60,12 +60,12 @@ service-identity==17.0.0
 six==1.11.0
 smmap2==2.0.4
 trello==0.9.1
-Twisted==18.4.0
+Twisted==19.7.0
 typing==3.6.6
-urllib3==1.23
+urllib3==1.24.2
 vine==1.1.4
 virtualenv==16.0.0
 virtualenv-clone==0.5.3
 w3lib==1.19.0
-Werkzeug==0.14.1
+Werkzeug==0.15.3
 zope.interface==4.5.0
