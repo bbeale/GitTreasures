@@ -33,7 +33,7 @@ These instructions are for integration with a GitLab hosted repository. GitHub i
 
 4) Run `init.py` to initialize the database with commit data
 
-`cd ../ && python task_scripts/db_setup.py`
+`cd ../ && python init.py`
 
 ####*Endpoint*
 
