@@ -1,0 +1,31 @@
+# Copy this file into config.ini
+# Fill in missing values with those of your systems
+
+[trello]
+key                 :
+token               :
+board_id            :
+test_board_id       :
+archive_board_id    :
+
+[jira]
+url                 :
+username            :
+token               :
+project_key         :
+
+[git]
+repo_path           :
+staging_branch_name :
+jira_pattern        :
+
+[testrail]
+url                 :
+user                :
+password            :
+
+[gitlab]
+repo_path           :
+token               :
+project_id          :
+

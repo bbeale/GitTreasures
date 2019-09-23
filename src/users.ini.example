@@ -1,0 +1,49 @@
+[tester name]
+name                :
+email               :
+trello_id           :
+trello_username     :
+jira_username       :
+jira_displayname    :
+;gitlab_username     :
+
+[another tester name]
+name                :
+email               :
+trello_id           :
+trello_username     :
+jira_username       :
+jira_displayname    :
+;gitlab_username     :
+
+[yet another tester name]
+name                :
+email               :
+trello_id           :
+trello_username     :
+jira_username       :
+jira_displayname    :
+;gitlab_username     :
+
+[...]
+name                :
+email               :
+trello_id           :
+trello_username     :
+jira_username       :
+jira_displayname    :
+;gitlab_username     :
+
+[...]
+name                :
+email               :
+trello_id           :
+trello_username     :
+jira_username       :
+jira_displayname    :
+;gitlab_username     :
+
+.....
+
+
+
