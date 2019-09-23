@@ -1,0 +1,13 @@
+.idea/*
+data/*
+repos/*
+*pycache*
+*.pyc
+*pytest_cache*
+htmlcov/*
+
+# specific files
+config.ini
+users.ini
+trello_lists.ini
+.coverage
