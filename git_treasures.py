@@ -23,11 +23,11 @@ usage = """Use this tool to update a Trello board with QA order/priorities based
 parser = ArgumentParser()
 
 # use a different entrypoint based on CLI args
-parser.add_argument("--test", help="Run the development version of the script")
+parser.add_argument("--dev", help="Run the development version of the script")
 parser.add_argument("--testrail", help="Run the TestRail integration")
-parser.add_argument("--testrail-test", help="Run the test version of the TestRail integration")
+parser.add_argument("--testrail-dev", help="Run the test version of the TestRail integration")
 parser.add_argument("--gitlab", help="Run the GitLab version of the script")
-parser.add_argument("--gitlab-test", help="Run the GitLab development version of the script")
+parser.add_argument("--gitlab-dev", help="Run the GitLab development version of the script")
 parser.add_argument("--github", help="Run the GitHub version of the script")
 
 # database path shouldn't change
@@ -45,9 +45,79 @@ config = configparser.ConfigParser()
 
 try:
     config.read(os.path.relpath("config.ini"))
-except configparser.Error as e:
+except OSError as e:
     print(e, "Cannot get settings from config file")
     sys.exit(1)
+
+_name = inspect.stack()[0][3]
+
+try:
+    # Trello config values
+    trello_config = dict(
+        key                 = config["trello"]["key"],
+        token               = config["trello"]["token"],
+        board_id            = config["trello"]["board_id"],
+        test_board_id       = config["trello"]["test_board_id"],
+        archive_board_id    = config["trello"]["archive_board_id"],
+    )
+
+    # Jira config values
+    jira_config = dict(
+        f_name              = _name,
+        url                 = config["jira"]["url"],
+        username            = config["jira"]["username"],
+        token               = config["jira"]["token"],
+        project_key         = config["jira"]["project_key"]
+    )
+
+    # git config values
+    git_config = dict(
+        repo_path           = config["git"]["repo_path"],
+        staging_branch_name = config["git"]["staging_branch_name"],
+        jira_pattern        = config["git"]["jira_pattern"],
+        db_path             = db_path
+    )
+
+    # GitLab config values
+    gitlab_config = dict(
+        repo_path           = config["gitlab"]["repo_path"],
+        token               = config["gitlab"]["token"],
+        project_id          = config["gitlab"]["project_id"],
+        staging_branch_name = config["git"]["staging_branch_name"],
+        jira_pattern        = config["git"]["jira_pattern"],
+        db_path             = db_path
+    )
+
+    # Trello reconciler config values
+    tr_config = dict(
+        filter_qa_status    = config["jira"]["filter_qa_status"],
+        project_key         = config["jira"]["project_key"],
+        jira_pattern        = r'{}'.format(config["git"]["jira_pattern"]),
+    )
+
+    # TestRail config values
+    testrail_config = dict(
+        url                 = config["testrail"]["url"],
+        user                = config["testrail"]["user"],
+        password            = config["testrail"]["password"],
+    )
+
+    # TestRail reconciler config values
+    trr_config = dict(
+        project_key         = config["jira"]["project_key"],
+        filter_last_week    = config["jira"]["filter_last_week"],
+        filter_this_release = config["jira"]["filter_this_release"],
+    )
+    print(".")
+
+except KeyError as KE:
+    print(KE, "Key does not exist")
+    sys.exit(-1)
+
+except configparser.Error as E:
+    print(E, "Failed to get settings from config file")
+    sys.exit(-1)
+
 
 
 def main():
@@ -58,61 +128,6 @@ def main():
     Other "versions" that were previously separate files can be called by specifying the command line argument for the thing that the old file used to do
     """
     print('Starting GitTreasures')
-
-    global db_path
-    _name                   = inspect.stack()[0][3]
-
-    # get Trello config values
-    try:
-        trello_config = dict(
-            key                 = config["trello"]["key"],
-            token               = config["trello"]["token"],
-            board_id            = config["trello"]["board_id"],
-            test_board_id       = config["trello"]["test_board_id"],
-            archive_board_id    = config["trello"]["archive_board_id"],
-        )
-
-    except configparser.Error:
-        print("Failed to get Trello settings from config file")
-        sys.exit(-1)
-
-    # get Jira config values
-    try:
-        jira_config = dict(
-            f_name              = _name,
-            url                 = config["jira"]["url"],
-            username            = config["jira"]["username"],
-            token               = config["jira"]["token"],
-            project_key         = config["jira"]["project_key"]
-        )
-
-    except configparser.Error:
-        print("Failed to get Jira settings from config file")
-        sys.exit(-1)
-
-    # get Git config values
-    try:
-        git_config = dict(
-            repo_path           = config["git"]["repo_path"],
-            staging_branch_name = config["git"]["staging_branch_name"],
-            jira_pattern        = config["git"]["jira_pattern"],
-            db_path             = db_path
-        )
-
-    except configparser.Error:
-        print("Failed to get Git settings from config file")
-        sys.exit(-1)
-
-    # finally the reconciler config values
-    try:
-        tr_config = dict(
-            filter_qa_status    = config["jira"]["filter_qa_status"],
-            jira_pattern        = r'{}'.format(config["git"]["jira_pattern"]),
-        )
-
-    except configparser.Error as E:
-        print("Failed to get reconciler settings", E)
-        sys.exit(-1)
 
     start               = time.time()
 
@@ -132,64 +147,9 @@ def main():
     print('duration: {}s'.format(str(duration)))
 
 
-def main_test():
+def dev():
     """The development/test entry point."""
     print('Starting GitTreasures in TEST MODE')
-
-    global db_path
-    _name                   = inspect.stack()[0][3]
-
-    # get Trello config values
-    try:
-        trello_config = dict(
-            key                 = config["trello"]["key"],
-            token               = config["trello"]["token"],
-            board_id            = config["trello"]["board_id"],
-            test_board_id       = config["trello"]["test_board_id"],
-            archive_board_id    = config["trello"]["archive_board_id"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Trello settings from config file", E)
-        sys.exit(-1)
-
-    # get Jira config values
-    try:
-        jira_config = dict(
-            f_name              = _name,
-            url                 = config["jira"]["url"],
-            username            = config["jira"]["username"],
-            token               = config["jira"]["token"],
-            project_key         = config["jira"]["project_key"]
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Jira settings from config file", E)
-        sys.exit(-1)
-
-    # get Git config values
-    try:
-        git_config = dict(
-            repo_path           = config["git"]["repo_path"],
-            staging_branch_name = config["git"]["staging_branch_name"],
-            jira_pattern        = config["git"]["jira_pattern"],
-            db_path             = db_path
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Git settings from config file", E)
-        sys.exit(-1)
-
-    # finally the reconciler config values
-    try:
-        tr_config = dict(
-            filter_qa_status    = config["jira"]["filter_qa_status"],
-            jira_pattern        = r'{}'.format(config["git"]["jira_pattern"]),
-        )
-
-    except configparser.Error as E:
-        print("Failed to get reconciler settings", E)
-        sys.exit(-1)
 
     start               = time.time()
 
@@ -209,62 +169,9 @@ def main_test():
     print('duration: {}s'.format(str(duration)))
 
 
-def main_testrail():
+def testrail_main():
     """Main TestRail entry point."""
     print('Starting TestRail sync')
-
-    _name                   = inspect.stack()[0][3]
-
-    # get TestRail config values
-    try:
-        testrail_config = dict(
-            url                 = config["testrail"]["url"],
-            user                = config["testrail"]["user"],
-            password            = config["testrail"]["password"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Trello settings from config file", E)
-        sys.exit(-1)
-
-    # get Jira config values
-    try:
-        jira_config = dict(
-            f_name              = _name,
-            url                 = config["jira"]["url"],
-            username            = config["jira"]["username"],
-            token               = config["jira"]["token"],
-            project_key         = config["jira"]["project_key"]
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Jira settings from config file", E)
-        sys.exit(-1)
-
-    # get Trello config values
-    try:
-        trello_config = dict(
-            key                 = config["trello"]["key"],
-            token               = config["trello"]["token"],
-            board_id            = config["trello"]["board_id"],
-            test_board_id       = config["trello"]["test_board_id"],
-            archive_board_id    = config["trello"]["archive_board_id"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Trello settings from config file", E)
-        sys.exit(-1)
-
-    # assemble reconciler config dict
-    try:
-        trr_config = dict(
-            filter_last_week    = config["jira"]["filter_last_week"],
-            filter_this_release = config["jira"]["filter_this_release"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get reconciler settings", E)
-        sys.exit(-1)
 
     start                   = time.time()
     testrail                = TestRail(testrail_config)
@@ -279,62 +186,9 @@ def main_testrail():
     print('duration: {}s'.format(str(duration)))
 
 
-def main_testrail_test():
+def testrail_dev():
     """TestRail development/test entry point."""
     print('Starting TestRail sync in TEST MODE')
-
-    _name = inspect.stack()[0][3]
-
-    # get TestRail config values
-    try:
-        testrail_config = dict(
-            url                 = config["testrail"]["url"],
-            user                = config["testrail"]["user"],
-            password            = config["testrail"]["password"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Trello settings from config file", E)
-        sys.exit(-1)
-
-    # get Jira config values
-    try:
-        jira_config = dict(
-            f_name              = _name,
-            url                 = config["jira"]["url"],
-            username            = config["jira"]["username"],
-            token               = config["jira"]["token"],
-            project_key         = config["jira"]["project_key"]
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Jira settings from config file", E)
-        sys.exit(-1)
-
-    # get Trello config values
-    try:
-        trello_config = dict(
-            key                 = config["trello"]["key"],
-            token               = config["trello"]["token"],
-            board_id            = config["trello"]["board_id"],
-            test_board_id       = config["trello"]["test_board_id"],
-            archive_board_id    = config["trello"]["archive_board_id"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get Trello settings from config file", E)
-        sys.exit(-1)
-
-    # assemble reconciler config dict
-    try:
-        trr_config = dict(
-            filter_last_week    =config["jira"]["filter_last_week"],
-            filter_this_release =config["jira"]["filter_this_release"],
-        )
-
-    except configparser.Error as E:
-        print("Failed to get reconciler settings", E)
-        sys.exit(-1)
 
     start                   = time.time()
     testrail                = TestRail(testrail_config)
@@ -349,68 +203,12 @@ def main_testrail_test():
     print('duration: {}s'.format(str(duration)))
 
 
-def main_gitlab():
+def gitlab_main():
     """The development version of the GitLab entry point.
     This will replace the main version after the migration to GitLab.
 
     """
     print('Starting GitTreasures with GitLab')
-
-    global db_path
-    _name                   = inspect.stack()[0][3]
-
-    try:
-        trello_config = dict(
-            key                 = config["trello"]["key"],
-            token               = config["trello"]["token"],
-            board_id            = config["trello"]["board_id"],
-            test_board_id       = config["trello"]["test_board_id"],
-            archive_board_id    = config["trello"]["archive_board_id"],
-        )
-
-    except configparser.Error:
-        print("Failed to get Trello settings from config file")
-        sys.exit(-1)
-
-    # get Jira config values
-    try:
-        jira_config = dict(
-            f_name              = _name,
-            url                 = config["jira"]["url"],
-            username            = config["jira"]["username"],
-            token               = config["jira"]["token"],
-            project_key         = config["jira"]["project_key"]
-        )
-
-    except configparser.Error:
-        print("Failed to get Jira settings from config file")
-        sys.exit(-1)
-
-    # get GitLab config values
-    try:
-        gitlab_config = dict(
-            repo_path           = config["gitlab"]["repo_path"],
-            token               = config["gitlab"]["token"],
-            project_id          = config["gitlab"]["project_id"],
-            staging_branch_name = config["git"]["staging_branch_name"],
-            jira_pattern        = config["git"]["jira_pattern"],
-            db_path             = db_path
-        )
-
-    except configparser.Error:
-        print("Failed to get GitLab settings from config file")
-        sys.exit(-1)
-
-    # finally the reconciler config values
-    try:
-        tr_config = dict(
-            filter_qa_status    = config["jira"]["filter_qa_status"],
-            jira_pattern        = r'{}'.format(config["git"]["jira_pattern"]),
-        )
-
-    except configparser.Error as E:
-        print("Failed to get reconciler settings", E)
-        sys.exit(-1)
 
     start               = time.time()
 
@@ -430,68 +228,12 @@ def main_gitlab():
     print('duration: {}s'.format(str(duration)))
 
 
-def main_gitlab_test():
+def gitlab_dev():
     """The development version of the GitLab entry point.
     This will replace the main version after the migration to GitLab.
 
     """
     print('Starting GitTreasures with GitLab in TEST MODE')
-
-    global db_path
-    _name                   = inspect.stack()[0][3]
-
-    try:
-        trello_config = dict(
-            key                 = config["trello"]["key"],
-            token               = config["trello"]["token"],
-            board_id            = config["trello"]["board_id"],
-            test_board_id       = config["trello"]["test_board_id"],
-            archive_board_id    = config["trello"]["archive_board_id"],
-        )
-
-    except configparser.Error:
-        print("Failed to get Trello settings from config file")
-        sys.exit(-1)
-
-    # get Jira config values
-    try:
-        jira_config = dict(
-            f_name              = _name,
-            url                 = config["jira"]["url"],
-            username            = config["jira"]["username"],
-            token               = config["jira"]["token"],
-            project_key         = config["jira"]["project_key"]
-        )
-
-    except configparser.Error:
-        print("Failed to get Jira settings from config file")
-        sys.exit(-1)
-
-    # get GitLab config values
-    try:
-        gitlab_config = dict(
-            repo_path           = config["gitlab"]["repo_path"],
-            token               = config["gitlab"]["token"],
-            project_id          = config["gitlab"]["project_id"],
-            staging_branch_name = config["git"]["staging_branch_name"],
-            jira_pattern        = config["git"]["jira_pattern"],
-            db_path             = db_path
-        )
-
-    except configparser.Error:
-        print("Failed to get GitLab settings from config file")
-        sys.exit(-1)
-
-    # finally the reconciler config values
-    try:
-        tr_config = dict(
-            filter_qa_status    = config["jira"]["filter_qa_status"],
-            jira_pattern        = r'{}'.format(config["git"]["jira_pattern"]),
-        )
-
-    except configparser.Error as E:
-        print("Failed to get reconciler settings", E)
-        sys.exit(-1)
 
     start               = time.time()
 
@@ -516,20 +258,20 @@ if __name__ == '__main__':
     if len(sys.argv[1:]) == 0:
         main()
 
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--test":
-        main_test()
+    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--dev":
+        dev()
 
     elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--testrail":
-        main_testrail()
+        testrail_main()
 
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--testrail-test":
-        main_testrail_test()
+    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--testrail-dev":
+        testrail_dev()
 
     elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--gitlab":
-        main_gitlab()
+        gitlab_main()
 
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--gitlab-test":
-        main_gitlab_test()
+    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--gitlab-dev":
+        gitlab_dev()
 
     elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--github":
         raise NotImplementedError       # TODO
