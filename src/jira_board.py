@@ -166,16 +166,6 @@ class JiraBoard:
         issue = self.jira.issue(issue_key, fields='labels', expand='changelog')
         return next(filter(lambda l: l.lower() == 'hotfix', issue.fields.labels), None) is not None
 
-    def isAtomic(self, issue_key):
-        """Given am issue_key, check if the story is from Atomic Object.
-
-        :param issue_key: a Jira story key
-        :return boolean: True if story is from Atomic Object, otherwise False
-        """
-        if not issue_key or issue_key is None:
-            raise JiraBoardIssueException("Invalid issue_key")
-        return 'MMDH-' in self.jira.issue(issue_key).key
-
     def isInStaging(self, issue_key, stories):
         """Given am issue_key, check if the story is in the staging branch.
 
