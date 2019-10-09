@@ -29,9 +29,10 @@ class TestRailReconciler:
         if not trello or trello is None:
             raise ReconcileTrelloBoardException("Initialization fail - missing TrelloBoard instance")
 
-        self.testers = [t for t in get_configs(["jira_displayname", "trello_id"]).values()]
+        upath = (os.path.relpath(os.path.join("src", "users.ini")))
+        self.testers = [t for t in get_configs(["jira_displayname", "trello_id"], upath).values()]
 
-        print('Grabbing stories from Jira that need regression tests...')
+        print("Grabbing stories from Jira that need regression tests...")
 
         # self.testers            = [Scott, Ben, Ranjeetha, Sandhya]
         self.testrail           = testrail
@@ -64,7 +65,7 @@ class TestRailReconciler:
         if not card or card is None:
             raise ReconcileTrelloCardException("Invalid Trello card")
         if card["name"] in self.trello.cards:
-            self.trello.addNewLabel(card["id"], "regressiontests", color="purple")
+            self.trello.add_new_label(card["id"], "regressiontests", color="purple")
 
     # Jira methods
     def jira_getProject(self, jira):
@@ -193,7 +194,7 @@ class TestRailReconciler:
         if not project_id or project_id is None:
             raise ReconcileTestRailProjectException("Invalid project_id")
         toTestRail = []
-        testers = [t.jira_displayname for t in self.testers]
+        testers = [t["jira_displayname"] for t in self.testers]
         for untested in list(filter(lambda s: s["tested_by"] in testers, jira_stories)):
 
             data = dict(
@@ -232,26 +233,30 @@ class TestRailReconciler:
         # Trello
         self.trello_checkitems = self.testrail_populateSections(self.testrail_project["id"], self.last_week)
         cardName = "{} {}".format(self.testrail_project_name, datetime.date.today().strftime("%Y-%m-%d"))
-        card = next(filter(lambda c: c["cardName"] == cardName, [card for card in self.trello.cards]), None)
+        card = next(filter(lambda c: c["name"] == cardName, [card for card in self.trello.cards]), None)
 
         if card is None:
 
-            newCard = self.trello.addNewCard(cardName, self.trello.otherListId, "top",
+            newCard = self.trello.add_new_card(cardName, self.trello.otherListId, "top",
                                              "Weekly Regression testing for stories that have passed QA over the period of the last 7 days.")
-            self.trello.addNewLabel(newCard["id"], "regressiontests", color="purple")
 
-            for trello_testerID in [t.trello_id for t in self.testers]:
-                self.trello.addMember(newCard["id"], trello_testerID)
 
-            checklist = self.trello.addChecklist(newCard["id"])
+            self.trello.add_new_label(newCard["id"], "regressiontests", color="purple")
+
+            for trello_testerID in [t["trello_id"] for t in self.testers if "trello_id" in t.keys()]:
+                self.trello.add_new_member(newCard["id"], trello_testerID)
+
+            checklist = self.trello.add_new_checklist(newCard["id"])
             for ts in self.trello_checkitems:
-                self.trello.addChecklistItem(newCard["id"], checklist["id"], ts["name"])
+                self.trello.add_new_checklist_item(newCard["id"], checklist["id"], ts["name"])
 
         else:
-            # Assuming that if the card is not none, then it also has it's checklist
-            checklist = self.trello.getChecklist(card["cardID"])[0]
+            checklist = self.trello.get_checklist(card["id"])
+            if checklist is None or len(checklist) is 0:
+                checklist = self.trello.add_new_checklist(card["id"])
+
             for ts in self.trello_checkitems:
-                if ts["name"] not in self.trello.getChecklistItems(checklist["id"]):
-                    self.trello.addChecklistItem(card["cardID"], checklist["id"], ts["name"])
+                if ts["name"] not in self.trello.get_checklist_items(checklist["id"]):
+                    self.trello.add_new_checklist_item(card["id"], checklist["id"], ts["name"])
 
         print("\tDone")

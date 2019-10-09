@@ -91,7 +91,7 @@ def get_latest_commit(db_path):
     if not os.path.exists(db_path):
         raise FileNotFoundError
 
-    sql = "SELECT hash, committerDate FROM commits ORDER BY committerDate DESC"
+    sql = "SELECT commitID, hash, committerDate FROM commits ORDER BY committerDate DESC"
 
     try:
         conn = sqlite3.connect(db_path)
@@ -119,7 +119,7 @@ def get_latest_commit_hash(db_path):
         raise FileNotFoundError
 
     commit = get_latest_commit(db_path)
-    return commit[0] if commit is not None else None
+    return commit[1] if commit is not None else None
 
 
 def get_stored_commits(db_path, test_file=None):
@@ -185,17 +185,25 @@ def store_commit_data(db_path, values):
             or values is None or len(values.keys()) is 0:
         raise DbQueryAddValueException("values must be a dict with >1 record")
 
-    sql = "INSERT INTO commits (commitID,hash,committerDate,mainBranch,author_name,author_email,commitMessage) VALUES((?),(?),(?),(?),(?),(?),(?))"
-    values = (values["index"], values["hash"], values["committerDate"], values["mainBranch"], values["author_name"], values["author_email"], values["commitMessage"],)
-
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute(sql, values)
-        conn.commit()
-        conn.close()
-    except sqlite3.Error:
-        print("Hash already exists")
+        values["index"] = get_latest_commit(db_path)[0]
+    except TypeError as te:
+        print(te, "- unable to detect previous value")
+        values["index"] = 0
+
+    finally:
+        values["index"] += 1
+        sql = "INSERT INTO commits (commitID,hash,committerDate,mainBranch,author_name,author_email,commitMessage) VALUES((?),(?),(?),(?),(?),(?),(?))"
+        values = (values["index"], values["hash"], values["committerDate"], values["mainBranch"], values["author_name"], values["author_email"], values["commitMessage"],)
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(sql, values)
+            conn.commit()
+            conn.close()
+        except sqlite3.Error:
+            print("Hash already exists")
 
 
 def git_db_setup(db_path, ):

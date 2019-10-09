@@ -10,13 +10,15 @@ from src.exceptions import (
     CardIdException,
     CardNameException,
     ChecklistIdException,
-    ListIdNotSetException,
     MemberIdException,
     CardAttachmentException,
 )
 
 from util import get_configs
 
+from requests.exceptions import HTTPError
+
+import sys
 import os
 
 
@@ -28,7 +30,7 @@ class TrelloBoard:
         :param config: Trello configuration settings
         :param testMode: if True, use test board JSON file. Otherwise, use Trello API
         """
-        print('Initializing TrelloBoard')
+        print("Initializing TrelloBoard")
 
         listpath = os.path.relpath(os.path.join("src", "trello_lists.ini"))
         lists = get_configs(["other", "todo", "fail", "testing", "complete"], listpath)
@@ -53,24 +55,18 @@ class TrelloBoard:
             self.completeListId     = lists["prod"]["complete"]
 
         self.archive_board_id   = config["archive_board_id"]
-
-        self.trello             = TrelloApi(self.key, self.token)
-        self.board              = self.getTrelloBoard(self.board_id)
-        self.lists              = self.getBoardLists(self.board_id)
-
         self.cards              = []
-
-        self.members            = self.getBoardMembers(self.board_id)
-        self.labels             = self.getBoardLabels(self.board_id)
-
         self.cardCount          = 0
         self.trelloLabelsToSave = []
 
-        self.cards              = self.getCardDetailsByList(self.lists)
-        self.cardCount          = self.getCardCount(self.cards)
+        self.trello             = TrelloApi(self.key, self.token)
+        self.board              = None
+        self.lists              = None
+        self.labels             = None
+        self.members            = None
 
     # methods that "get" stuff
-    def getTrelloBoard(self, board_id):
+    def get_trello_board(self, board_id):
         """Given a board_id, retrieve Trello board data from API.
 
         :param board_id: board_id of a Trello board
@@ -78,9 +74,20 @@ class TrelloBoard:
         """
         if not board_id or board_id is None:
             raise BoardIdException("Invalid board_id")
-        return self.trello.ExtendedBoards.get_decoded_board(board_id)
 
-    def getBoardLists(self, board_id):
+        result = None
+        try:
+            result = self.trello.ExtendedBoards.get_decoded_board(board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Trello board.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedBoards.get_decoded_board(board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get Trello board.")
+        finally:
+            return result
+
+    def get_trello_lists(self, board_id):
         """Get all lists attached to a Trello board.
 
         :param board_id: ID of the board to grab lists from
@@ -88,9 +95,83 @@ class TrelloBoard:
         """
         if not board_id or board_id is None:
             raise BoardIdException("Invalid board_id")
-        return self.trello.ExtendedBoards.get_decoded_list(board_id)
 
-    def getCardList(self, card_id):
+        result = None
+        try:
+            result = self.trello.ExtendedBoards.get_decoded_list(board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Trello lists.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedBoards.get_decoded_list(board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get Trello lists.")
+        finally:
+            return result
+
+    def get_board_labels(self, board_id):
+        """Given a board_id, returns available labels attached to a Trello board.
+
+        :param board_id: ID of the board to grab labels from
+        :return: JSON representation of card labels
+        """
+        if not board_id or board_id is None:
+            raise BoardIdException("Invalid board_id")
+
+        result = None
+        try:
+            result = self.trello.ExtendedBoards.get_decoded_labels(board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get board-level labels.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedBoards.get_decoded_labels(board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get labels.")
+        finally:
+            return result
+
+    def get_board_members(self, board_id):
+        """Get members associated with a Trello board.
+
+        :param board_id: a Trello board ID
+        :return: JSON representation of board members
+        """
+        if not board_id or board_id is None:
+            raise BoardIdException("Invalid board_id")
+
+        result = None
+        try:
+            result = self.trello.ExtendedBoards.get_decoded_member(board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get board-level members.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedBoards.get_decoded_member(board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get members.")
+        finally:
+            return result
+
+    def get_card_members(self, card_id):
+        """Get members assigned to a Trello card.
+
+        :param card_id: a Trello card ID
+        :return: JSON representation of card members
+        """
+        if not card_id or card_id is None:
+            raise CardIdException("Invalid card_id")
+
+        result = None
+        try:
+            result = self.trello.ExtendedCards.get_decoded_member(card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get card-level members.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedCards.get_decoded_member(card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get members.")
+        finally:
+            return result
+
+    def get_trello_card_list(self, card_id):
         """Get the list object that a card is in, given the card's ID
 
         :param card_id: ID of a card whose list to return
@@ -98,17 +179,28 @@ class TrelloBoard:
         """
         if not card_id or card_id is None:
             raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.get_decoded_list(card_id)
+        result = None
+        try:
+            result = self.trello.ExtendedCards.get_decoded_list(card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get list containing given card_id.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedCards.get_decoded_list(card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get list.")
+        finally:
+            return result
 
-    def getCardListName(self, card_id):
+    def get_trello_card_list_name(self, card_id):
         """Get the list NAME that a card is in, given the card's ID
 
         :param card_id: ID of a card whose list to return
         :return: list name string
         """
-        return self.getCardList(card_id)["name"]
+        card_id_list = self.get_trello_card_list(card_id)
+        return card_id_list["name"] if card_id_list is not None else None
 
-    def getCardDetailsByList(self, lists):
+    def get_cards_from_lists(self, lists):
         """Given a list of Trello lists, get data for all card on each list.
 
         :param lists: a list of lists to grab cards from.
@@ -118,24 +210,46 @@ class TrelloBoard:
             raise ListException("Invalid collection of lists - cannot be None")
         tmp = []
         for trello_list in lists:
-            trello_cards = self.trello.ExtendedLists.get_decoded_card(trello_list['id'])
-            for card in trello_cards:
-                tmp.append(
-                    dict(
-                        listID      = trello_list['id'],
-                        listName    = trello_list['name'],
-                        pos         = card['pos'],
-                        cardID      = card['id'],
-                        cardName    = card['name'],
-                        cardDesc    = card['desc'],
-                        labels      = card['idLabels'],
-                        members     = card['idMembers']
+            trello_cards = self.get_cards_from_list(trello_list["id"])
+            # check if trello_cards is None or zero before trying to add them to tmp
+            if len(trello_cards) > 0:
+                for card in trello_cards:
+                    tmp.append(
+                        dict(
+                            listID      = trello_list["id"],
+                            listName    = trello_list["name"],
+                            pos         = card["pos"],
+                            id          = card["id"],
+                            name        = card["name"],
+                            cardDesc    = card["desc"],
+                            labels      = card["idLabels"],
+                            members     = card["idMembers"]
+                        )
                     )
-                )
 
         return tmp
 
-    def getCard(self, card_id):
+    def get_cards_from_list(self, list_id):
+        """ Given a Trello list_ID, get data for all card on that list.
+
+        :param list_id:
+        :return:
+        """
+        if not list_id or list_id is None:
+            raise ListIdException("Invalid list_id")
+        cards = []
+        try:
+            cards = self.trello.ExtendedLists.get_decoded_card(list_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Unable to get cards from list.\nRetrying in a few seconds.")
+            try:
+                cards = self.trello.ExtendedLists.get_decoded_card(list_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Could not get all cards from list.\nReturning what we have.")
+        finally:
+            return cards
+
+    def get_card(self, card_id):
         """Get data representing a Trello card by its card_id.
 
         :param card_id: ID of a card whose data to return
@@ -143,9 +257,20 @@ class TrelloBoard:
         """
         if not card_id or card_id is None:
             raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.get_decoded_card(card_id)
 
-    def getCardCount(self, cards):
+        result = None
+        try:
+            result = self.trello.ExtendedCards.get_decoded_card(card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to find a card with given card_id.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedCards.get_decoded_card(card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get card.")
+        finally:
+            return result
+
+    def get_card_count(self, cards):
         """Given a list of cards, return the count.
 
         :param cards: list of cards to count
@@ -153,39 +278,11 @@ class TrelloBoard:
         """
         if cards is None:
             raise CardException("Cards cannot be None")
-        return len(list(filter(lambda card: card['listName'] != 'complete', cards)))
+        if len(cards) is 0:
+            return 0
+        return len(list(filter(lambda card: card["listName"] != "complete", cards)))
 
-    def getBoardLabels(self, board_id):
-        """Given a board_id, returns available labels attached to a Trello board.
-
-        :param board_id: ID of the board to grab labels from
-        :return: JSON representation of card labels
-        """
-        if not board_id or board_id is None:
-            raise BoardIdException("Invalid board_id")
-        return self.trello.ExtendedBoards.get_decoded_labels(board_id)
-
-    def getMembers(self, card_id):
-        """Get members assigned to a Trello card.
-
-        :param card_id: a Trello card ID
-        :return: JSON representation of card members
-        """
-        if not card_id or card_id is None:
-            raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.get_decoded_member(card_id)
-
-    def getBoardMembers(self, board_id):
-        """Get members associated with a Trello board.
-
-        :param board_id: a Trello board ID
-        :return: JSON representation of board members
-        """
-        if not board_id or board_id is None:
-            raise BoardIdException("Invalid board_id")
-        return self.trello.ExtendedBoards.get_decoded_member(board_id)
-
-    def getAttachments(self, card_id):
+    def get_attachments(self, card_id):
         """Get attachments from a Trello card.
 
         :param card_id: a Trello card ID
@@ -193,9 +290,20 @@ class TrelloBoard:
         """
         if not card_id or card_id is None:
             raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.get_decoded_attachment(card_id)
 
-    def getChecklist(self, card_id):
+        result = None
+        try:
+            result = self.trello.ExtendedCards.get_decoded_attachment(card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get attachments from given card_id.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedCards.get_decoded_attachment(card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get attachments.")
+        finally:
+            return result
+
+    def get_checklist(self, card_id):
         """Get checklist from a Trello card.
 
         :param card_id: a Trello card ID
@@ -203,9 +311,20 @@ class TrelloBoard:
         """
         if not card_id or card_id is None:
             raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.get_decoded_checklist(card_id)
 
-    def getChecklistItems(self, checklist_id):
+        result = None
+        try:
+            result = self.trello.ExtendedCards.get_decoded_checklist(card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get checklist from given card_id.\nRetrying in a few seconds.")
+            try:
+                result = self.trello.ExtendedCards.get_decoded_checklist(card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get checklist.")
+        finally:
+            return result   # if len(result) is not 0 else None
+
+    def get_checklist_items(self, checklist_id):
         """Get items from a checklist (on a Trello card).
 
         :param checklist_id: ID of a checklist on a Trello card
@@ -213,9 +332,20 @@ class TrelloBoard:
         """
         if not checklist_id or checklist_id is None:
             raise ChecklistIdException("Invalid checklist_id")
-        return [li["name"] for li in self.trello.ExtendedChecklists.get_decoded_checkItem(checklist_id, fields="name")]
 
-    def getBoardCards(self, board_id):
+        checklist_items = []
+        try:
+            checklist_items = self.trello.ExtendedChecklists.get_decoded_checkItem(checklist_id, fields="name")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get items from given checklist_id.\nRetrying in a few seconds.")
+            try:
+                checklist_items = self.trello.ExtendedChecklists.get_decoded_checkItem(checklist_id, fields="name")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get checklist items.")
+        finally:
+            return [li["name"] for li in checklist_items]
+
+    def get_board_cards(self, board_id):
         """Given a board_id, get all cards on a board.
 
         :param board_id: ID of a Trello board
@@ -223,59 +353,167 @@ class TrelloBoard:
         """
         if not board_id or board_id is None:
             raise BoardIdException("Invalid board_id")
-        return list(filter(lambda card: card['idList'] != self.completeListId, self.trello.ExtendedBoards.get_decoded_card(board_id)))
 
-    def getFailedList(self):
-        """Get cards in the "failed" list.
+        board_cards = []
+        try:
+            board_cards = self.trello.ExtendedBoards.get_decoded_card(board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get cards from given board_id.\nRetrying in a few seconds.")
+            try:
+                board_cards = self.trello.ExtendedBoards.get_decoded_card(board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to get cards.")
+        finally:
+            return list(filter(lambda card: card["idList"] != self.completeListId, board_cards))
 
-        :return: JSON representation of "failed" cards
-        """
-        if not self.failedListId:
-            raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
-        failed = self.trello.ExtendedLists.get_decoded_list(self.failedListId)
-        return self.trello.ExtendedLists.get_decoded_card(failed['id'])
+    # def get_failed(self):
+    #     """Get cards in the "failed" list.
+    #
+    #     :return: JSON representation of "failed" cards
+    #     """
+    #     if not self.failedListId:
+    #         raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
+    #
+    #     failed = None
+    #     result = None
+    #
+    #     try:
+    #         failed = self.trello.ExtendedLists.get_decoded_list(self.failedListId)
+    #     except HTTPError as httpe:
+    #         print(httpe.response.status_code, "- Failed to get the Failed list.\nRetrying in a few seconds.")
+    #         try:
+    #             failed = self.trello.ExtendedLists.get_decoded_list(self.failedListId)
+    #         except HTTPError as httpe:
+    #             print(httpe.response.status_code, "- Unable to get items in the Failed list.")
+    #     finally:
+    #         return failed
+    #
+    # def get_other_priorities(self):
+    #     """Get cards in the "other priorities" list.
+    #
+    #     :return: JSON representation of "other priorities" cards
+    #     """
+    #     if not self.otherListId:
+    #         raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
+    #
+    #     other = None
+    #
+    #     # try:
+    #     #     other = self.trello.ExtendedLists.get_decoded_list(self.otherListId)
+    #     # except HTTPError as httpe:
+    #     #     print(httpe.response.status_code, "- Failed to get the Other Priorities list.\nRetrying in a few seconds.")
+    #     #     other = self.trello.ExtendedLists.get_decoded_list(self.otherListId)
+    #     # finally:
+    #     #     if other is not None:
+    #     #         try:
+    #     #             result = self.trello.ExtendedLists.get_decoded_card(other["id"])
+    #     #         except HTTPError as httpe:
+    #     #             print(httpe.response.status_code, "- Failed to get items in the Other Priorities list.")
+    #     #         finally:
+    #     #             return result
+    #
+    #     try:
+    #         other = self.trello.ExtendedLists.get_decoded_list(self.otherListId)
+    #     except HTTPError as httpe:
+    #         print(httpe.response.status_code, "- Failed to get the Other Priorities list.\nRetrying in a few seconds.")
+    #         try:
+    #             other = self.trello.ExtendedLists.get_decoded_list(self.otherListId)
+    #         except HTTPError as httpe:
+    #             print(httpe.response.status_code, "- Unable to get items in the Other Priorities list.")
+    #     finally:
+    #         return other
+    #
+    # def get_todo(self):
+    #     """Get cards in the "to do" list.
+    #
+    #     :return: JSON representation of "to do" cards
+    #     """
+    #     if not self.todoListId:
+    #         raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
+    #
+    #     todo = None
+    #
+    #     # result = None
+    #     #
+    #     # try:
+    #     #     todo = self.trello.ExtendedLists.get_decoded_list(self.todoListId)
+    #     # except HTTPError as httpe:
+    #     #     print(httpe.response.status_code, "- Failed to get the Todo / Ready for QA list.\nRetrying in a few seconds.")
+    #     #     todo = self.trello.ExtendedLists.get_decoded_list(self.todoListId)
+    #     # finally:
+    #     #     if todo is not None:
+    #     #         try:
+    #     #             result = self.trello.ExtendedLists.get_decoded_card(todo["id"])
+    #     #         except HTTPError as httpe:
+    #     #             print(httpe.response.status_code, "- Failed to get items in the Todo / Ready for QA list.")
+    #     #         finally:
+    #     #             return result
+    #
+    #     try:
+    #         todo = self.trello.ExtendedLists.get_decoded_list(self.todoListId)
+    #     except HTTPError as httpe:
+    #         print(httpe.response.status_code, "- Failed to get the Ready for QA list.\nRetrying in a few seconds.")
+    #         try:
+    #             todo = self.trello.ExtendedLists.get_decoded_list(self.todoListId)
+    #         except HTTPError as httpe:
+    #             print(httpe.response.status_code, "- Unable to get Ready for QA list.")
+    #     finally:
+    #         return todo
+    #
+    # def get_testing_list(self):
+    #     """Get cards in the "testing" list.
+    #
+    #     :return: JSON representation of "testing" cards
+    #     """
+    #     if not self.testingListId:
+    #         raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
+    #
+    #     # testing = None
+    #     # result = None
+    #     #
+    #     # try:
+    #     #     testing = self.trello.ExtendedLists.get_decoded_list(self.testingListId)
+    #     # except HTTPError as httpe:
+    #     #     print(httpe.response.status_code, "- Failed to get the Testing list.\nRetrying in a few seconds.")
+    #     #     try:
+    #     #         testing = self.trello.ExtendedLists.get_decoded_list(self.testingListId)
+    #     #     except HTTPError as httpe:
+    #     #         print(httpe.response.status_code, "- Unable to get the Testing list.")
+    #     # finally:
+    #     #     if testing is not None:
+    #     #         try:
+    #     #             result = self.trello.ExtendedLists.get_decoded_card(testing["id"])
+    #     #         except HTTPError as httpe:
+    #     #             print(httpe.response.status_code, "- Failed to get items in the Testing list.")
+    #     #         finally:
+    #     #             return result
+    #
+    # def get_complete_list(self):
+    #     """Get cards in the "complete" list.
+    #
+    #     :return: JSON representation of "complete" cards
+    #     """
+    #     if not self.completeListId:
+    #         raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
+    #
+    #     # complete = None
+    #     # result = None
+    #     #
+    #     # try:
+    #     #     complete = self.trello.ExtendedLists.get_decoded_list(self.completeListId)
+    #     # except HTTPError as httpe:
+    #     #     print(httpe.response.status_code, "- Failed to get the Complete list.\nRetrying in a few seconds.")
+    #     #     complete = self.trello.ExtendedLists.get_decoded_list(self.completeListId)
+    #     # finally:
+    #     #     if complete is not None:
+    #     #         try:
+    #     #             result = self.trello.ExtendedLists.get_decoded_card(complete["id"])
+    #     #         except HTTPError as httpe:
+    #     #             print(httpe.response.status_code, "- Failed to get items in the Complete list.")
+    #     #         finally:
+    #     #             return result
 
-    def getOtherPrioritiesList(self):
-        """Get cards in the "other priorities" list.
-
-        :return: JSON representation of "other priorities" cards
-        """
-        if not self.otherListId:
-            raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
-        other = self.trello.ExtendedLists.get_decoded_list(self.otherListId)
-        return self.trello.ExtendedLists.get_decoded_card(other['id'])
-
-    def getTodoList(self):
-        """Get cards in the "to do" list.
-
-        :return: JSON representation of "to do" cards
-        """
-        if not self.todoListId:
-            raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
-        todo = self.trello.ExtendedLists.get_decoded_list(self.todoListId)
-        return self.trello.ExtendedLists.get_decoded_card(todo['id'])
-
-    def getTestingList(self):
-        """Get cards in the "testing" list.
-
-        :return: JSON representation of "testing" cards
-        """
-        if not self.testingListId:
-            raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
-        testing = self.trello.ExtendedLists.get_decoded_list(self.testingListId)
-        return self.trello.ExtendedLists.get_decoded_card(testing['id'])
-
-    def getCompleteList(self):
-        """Get cards in the "complete" list.
-
-        :return: JSON representation of "complete" cards
-        """
-        if not self.completeListId:
-            raise ListIdNotSetException("Missing a value for list_id. Did this not get set?")
-        complete = self.trello.ExtendedLists.get_decoded_list(self.completeListId)
-        return self.trello.ExtendedLists.get_decoded_card(complete['id'])
-
-    def addNewCard(self, card_name, card_list_id, pos, card_desc):
+    def add_new_card(self, card_name, card_list_id, pos, card_desc):
         """Add a new Trello card to a list on the board.
 
         :param card_name: name of the new Trello card
@@ -293,9 +531,20 @@ class TrelloBoard:
         # put card on the bottom if it somehow gets in w/o pos
         if not pos or pos is None:
             pos = "bottom"
-        return self.trello.ExtendedCards.new(card_name, card_list_id, pos, card_desc)
 
-    def addNewLabel(self, card_id, name, color='orange'):
+        new_card = None
+        try:
+            new_card = self.trello.ExtendedCards.new(card_name, card_list_id, pos, card_desc)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to add card.\nRetrying in a few seconds.")
+            try:
+                new_card = self.trello.ExtendedCards.new(card_name, card_list_id, pos, card_desc)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to add card.")
+        finally:
+            return new_card
+
+    def add_new_label(self, card_id, name, color="orange"):
         """Add a new label to a Trello card given a card_id. Default color is orange.
 
         :param card_id: ID of the card to get the label
@@ -307,9 +556,20 @@ class TrelloBoard:
             raise CardIdException("Invalid card_id")
         if not name or name is None:
             raise CardNameException("Invalid card name")
-        return self.trello.ExtendedCards.add_new_label(card_id, name, color)
 
-    def addMember(self, card_id, member_id):
+        new_label = None
+        try:
+            new_label = self.trello.ExtendedCards.add_new_label(card_id, name, color)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to add card label.\nRetrying in a few seconds.")
+            try:
+                new_label = self.trello.ExtendedCards.add_new_label(card_id, name, color)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to add card label.")
+        finally:
+            return new_label
+
+    def add_new_member(self, card_id, member_id):
         """Given a cardID and a member_id of a team member, assign that member to the card.
 
         :param card_id: id of the card to assign the member
@@ -320,9 +580,20 @@ class TrelloBoard:
             raise CardIdException("Invalid card_id")
         if not member_id or member_id is None:
             raise MemberIdException("Invalid member_id")
-        return self.trello.ExtendedCards.new_member(card_id, member_id)
 
-    def addAttachment(self, card_id, url):
+        new_member = None
+        try:
+            new_member = self.trello.ExtendedCards.new_member(card_id, member_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to add card member.\nRetrying in a few seconds.")
+            try:
+                new_member = self.trello.ExtendedCards.new_member(card_id, member_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to add card member.")
+        finally:
+            return new_member
+
+    def add_new_attachment(self, card_id, url):
         """Add a new attachment located at the given URL to a Trello card.
 
         :param card_id: ID of the card receiving the attachment
@@ -333,9 +604,20 @@ class TrelloBoard:
             raise CardIdException("Invalid card_id")
         if not url or url is None:
             raise CardAttachmentException("Invalid URL")
-        return self.trello.ExtendedCards.new_decoded_attachment(card_id, url)
 
-    def addChecklist(self, card_id, name=None):
+        attachment = None
+        try:
+            attachment = self.trello.ExtendedCards.new_decoded_attachment(card_id, url)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to add attachment.\nRetrying in a few seconds.")
+            try:
+                attachment = self.trello.ExtendedCards.new_decoded_attachment(card_id, url)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to add attachment.")
+        finally:
+            return attachment
+
+    def add_new_checklist(self, card_id, name=None):
         """Add a new checklist to a Trello card.
 
         :param card_id: ID of the card getting the checklist
@@ -344,9 +626,20 @@ class TrelloBoard:
         """
         if not card_id or card_id is None:
             raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.new_decoded_checklist(card_id, name)
 
-    def addChecklistItem(self, card_id, checklist_id, name):
+        checklist = None
+        try:
+            checklist = self.trello.ExtendedCards.new_decoded_checklist(card_id, name)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to add checklist.\nRetrying in a few seconds.")
+            try:
+                checklist = self.trello.ExtendedCards.new_decoded_checklist(card_id, name)
+            except HTTPError as httpe:
+                print(httpe.response.status_code,  "- Unable to add checklist.")
+        finally:
+            return checklist
+
+    def add_new_checklist_item(self, card_id, checklist_id, name):
         """Add a new item to a checklist on a Trello card.
 
         :param card_id: ID of the card with the checklist
@@ -360,10 +653,20 @@ class TrelloBoard:
         if not checklist_id or checklist_id is None:
             raise ChecklistIdException("Invalid checklist_id")
 
-        if self.getChecklist(card_id) is not None:
-            self.trello.ExtendedChecklists.new_decoded_checkItem(checklist_id, name)
+        item = None
+        if self.get_checklist(card_id) is not None:
+            try:
+                item = self.trello.ExtendedChecklists.new_decoded_checkItem(checklist_id, name)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to add checklist item.\nRetrying in a few seconds.")
+                try:
+                    item = self.trello.ExtendedChecklists.new_decoded_checkItem(checklist_id, name)
+                except HTTPError as httpe:
+                    print(httpe.response.status_code, "- Unable to add checklist item.")
+            finally:
+                return item
 
-    def addNewList(self, listName, board_id):
+    def add_new_list(self, listName, board_id):
         """Add a new list to a Trello board given a board_id.
 
         :param listName: name to give the new list
@@ -374,9 +677,20 @@ class TrelloBoard:
             raise ListNameException("List needs a name")
         if not board_id or board_id is None:
             raise BoardIdException("Invalid board_id")
-        return self.trello.ExtendedLists.new_decoded_list(listName, board_id)
 
-    def clearList(self, list_id):
+        new_list = None
+        try:
+            new_list = self.trello.ExtendedLists.new_decoded_list(listName, board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to add list.\nRetrying in a few seconds.")
+            try:
+                new_list = self.trello.ExtendedLists.new_decoded_list(listName, board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to add list.")
+        finally:
+            return new_list
+
+    def clear_list(self, list_id):
         """Given a list_id, archive all cards in that list.
 
         :param list_id: id of a Trello list
@@ -384,9 +698,16 @@ class TrelloBoard:
         """
         if not list_id or list_id is None:
             raise ListIdException("Invalid list_id")
-        return self.trello.ExtendedLists.archive_all_cards(list_id)
+        try:
+            self.trello.ExtendedLists.archive_all_cards(list_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to archive list.\nRetrying.")
+            try:
+                self.trello.ExtendedLists.archive_all_cards(list_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to archive list.")
 
-    def copyCard(self, card_id, destination_list_id=None):
+    def copy_card(self, card_id, destination_list_id=None):
         """Copy card to new list if the destination_list_id != current list_id.
 
         :param card_id: ID of the card to copy
@@ -397,10 +718,19 @@ class TrelloBoard:
             raise CardException("Must pass in a valid card")
         if not destination_list_id or destination_list_id is None:
             raise ListIdException("Invalid destination_list_id")
-        self.trello.ExtendedCards.copy_card(card_id, destination_list_id)
-        self.deleteCard(card_id)
 
-    def removeMember(self, card_id, member_id):
+        try:
+            self.trello.ExtendedCards.copy_card(card_id, destination_list_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to copy card.\nRetrying.")
+            try:
+                self.trello.ExtendedCards.copy_card(card_id, destination_list_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to copy card.")
+        else:
+            self.delete_card(card_id)
+
+    def remove_member(self, card_id, member_id):
         """Remove a member from a Trello card.
 
         :param card_id: ID of the card from which to remove a member
@@ -411,9 +741,17 @@ class TrelloBoard:
             raise CardIdException("Invalid card_id")
         if not member_id or member_id is None:
             raise MemberIdException("Invalid member_id")
-        return self.trello.ExtendedCards.delete_member_idMember(member_id, card_id)
 
-    def moveCard(self, card_id, list_id, pos='bottom'):
+        try:
+            self.trello.ExtendedCards.delete_member_idMember(member_id, card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to remove member from card.\nRetrying.")
+            try:
+                self.trello.ExtendedCards.delete_member_idMember(member_id, card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to remove member.")
+
+    def move_card(self, card_id, list_id, pos="bottom"):
         """Move a card from it's current list to the list at list_id.
 
         :param card_id: ID of the card to move
@@ -425,32 +763,17 @@ class TrelloBoard:
             raise CardIdException("Invalid card_id")
         if not list_id or list_id is None:
             raise ListIdException("Invalid list_id")
-        return self.trello.ExtendedCards.update_idList_pos(card_id, list_id, pos=pos)
 
-    def moveCardToTop(self, card_id, list_id):
-        """Move a card card_id to the top of a list list_id.
+        try:
+            self.trello.ExtendedCards.update_idList_pos(card_id, list_id, pos=pos)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to move card.\nRetrying.")
+            try:
+                self.trello.ExtendedCards.update_idList_pos(card_id, list_id, pos=pos)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to move card.")
 
-        :param card_id: ID of the card to move
-        :param list_id: ID of the list to move the card into
-        :return:
-        """
-        if not card_id or card_id is None:
-            raise CardIdException("Invalid card_id")
-        if not list_id or list_id is None:
-            raise ListIdException("Invalid list_id")
-        return self.trello.ExtendedCards.update_idList_pos(card_id, list_id, pos='top')
-
-    def moveCardToComplete(self, card_id):
-        """Move a card to the "complete" list
-
-        :param card_id: ID of the card to move
-        :return:
-        """
-        if not card_id or card_id is None:
-            raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.update_idList_pos(card_id, self.completeListId, pos='bottom')
-
-    def deleteCard(self, card_id):
+    def delete_card(self, card_id):
         """Delete a card with the given card_id.
 
         :param card_id: ID of the card to delete
@@ -458,9 +781,17 @@ class TrelloBoard:
         """
         if not card_id or card_id is None:
             raise CardIdException("Invalid card_id")
-        return self.trello.ExtendedCards.delete(card_id)
 
-    def moveAllCardsInList(self, list_id, idBoard, idList):
+        try:
+            self.trello.ExtendedCards.delete(card_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to delete card.\nRetrying.")
+            try:
+                self.trello.ExtendedCards.delete(card_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to delete card.")
+
+    def move_all_cards_in_list(self, list_id, idBoard, idList):
         """Move all cards in a list to another list.
 
         :param list_id: ID of the list to move cards from
@@ -474,4 +805,39 @@ class TrelloBoard:
             raise BoardIdException("Invalid destination idBoard")
         if not idList or idList is None:
             raise ListIdException("Invalid destination idList")
-        return self.trello.ExtendedLists.move_all_cards(list_id, idBoard, idList)
+
+        try:
+            self.trello.ExtendedLists.move_all_cards(list_id, idBoard, idList)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to move cards to new list.\nRetrying.")
+            try:
+                self.trello.ExtendedLists.move_all_cards(list_id, idBoard, idList)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Unable to move cards.")
+
+    def populate(self):
+        """Populate the things declared in __init__."""
+
+        self.board = self.get_trello_board(self.board_id)
+        self.lists = self.get_trello_lists(self.board_id)
+        self.labels = self.get_board_labels(self.board_id)
+        self.members = self.get_board_members(self.board_id)
+
+        if self.board is None:
+            print("TrelloBoard initialization failed: Unable to grab board from Trello")
+            sys.exit(-1)
+
+        if self.lists is None:
+            print("TrelloBoard initialization failed: Unable to grab lists from Trello")
+            sys.exit(-1)
+
+        if self.members is None:
+            print("TrelloBoard initialization failed: Unable to grab board members from Trello")
+            sys.exit(-1)
+
+        if self.labels is None:
+            print("TrelloBoard initialization failed: Unable to grab board members from Trello")
+            sys.exit(-1)
+
+        self.cards = self.get_cards_from_lists(self.lists)
+        self.cardCount = len([card for card in self.cards if card["listID"] != self.completeListId])

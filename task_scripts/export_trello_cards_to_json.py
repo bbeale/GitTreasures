@@ -32,7 +32,7 @@ def main():
     return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
 
@@ -44,22 +44,22 @@ def exportCardsToJson(trelloboard):
 
     else:
         output = []
-        print('Exporting card data to JSON...')
+        print("Exporting card data to JSON...")
         cards = []
         lists = trelloboard.trello.boards.get_list(trelloboard.board_id)
         for l in lists:
             cardsFromList = trelloboard.trello.lists.get_card(l['id'])
             for card in cardsFromList:
                 cards.append({
-                    'listID': l['id'],
-                    'listName': l['name'],
-                    'cardID': card['id'],
-                    'cardName': card['name'],
-                    'cardDesc': card['desc']
+                    "listID": list["id"],
+                    "listName": list["name"],
+                    "id": card["id"],
+                    "name": card["name"],
+                    "cardDesc": card["desc"]
                 })
 
         for finalCard in cards:
             output.append(finalCard)
 
-    with open(os.path.join('testTrelloData.json'), 'w') as trelloData:
+    with open(os.path.join("testTrelloData.json"), "w") as trelloData:
         json.dump(output, trelloData)

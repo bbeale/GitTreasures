@@ -19,7 +19,7 @@ except configparser.Error as e:
     sys.exit(1)
 
 db_path = os.path.join(
-    'data', 'git_treasures.db'
+    "data", "git_treasures.db"
 )
 
 if is_db_init(db_path):
@@ -53,5 +53,5 @@ def main():
         print(sqle, "Initialization failed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

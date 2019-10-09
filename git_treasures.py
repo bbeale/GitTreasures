@@ -33,8 +33,8 @@ parser.add_argument("--github", help="Run the GitHub version of the script")
 # database path shouldn't change
 db_path = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
-    'data',
-    'git_treasures.db'
+    "data",
+    "git_treasures.db"
 )
 
 if not is_db_init(db_path):
@@ -92,7 +92,7 @@ try:
     tr_config = dict(
         filter_qa_status    = config["jira"]["filter_qa_status"],
         project_key         = config["jira"]["project_key"],
-        jira_pattern        = r'{}'.format(config["git"]["jira_pattern"]),
+        jira_pattern        = r"{}".format(config["git"]["jira_pattern"]),
     )
 
     # TestRail config values
@@ -108,7 +108,6 @@ try:
         filter_last_week    = config["jira"]["filter_last_week"],
         filter_this_release = config["jira"]["filter_this_release"],
     )
-    print(".")
 
 except KeyError as KE:
     print(KE, "Key does not exist")
@@ -119,7 +118,6 @@ except configparser.Error as E:
     sys.exit(-1)
 
 
-
 def main():
     """The main entry point into the application.
 
@@ -127,12 +125,14 @@ def main():
 
     Other "versions" that were previously separate files can be called by specifying the command line argument for the thing that the old file used to do
     """
-    print('Starting GitTreasures')
+    print("Starting GitTreasures")
 
     start               = time.time()
 
     # initialize interfaces with Trello, Jira and Git
     trello              = TrelloBoard(trello_config)
+    trello.populate()
+
     jira                = JiraBoard(jira_config)
     git                 = GitLog(git_config)
 
@@ -144,17 +144,19 @@ def main():
     end                 = time.time()
     duration            = int(end) - int(start)
 
-    print('duration: {}s'.format(str(duration)))
+    print("duration: {}s".format(str(duration)))
 
 
 def dev():
     """The development/test entry point."""
-    print('Starting GitTreasures in TEST MODE')
+    print("Starting GitTreasures in TEST MODE")
 
     start               = time.time()
 
     # initialize interfaces with Trello, Jira and Git
     trello              = TrelloBoard(trello_config, testMode=True)
+    trello.populate()
+
     jira                = JiraBoard(jira_config)
     git                 = GitLog(git_config)
 
@@ -166,34 +168,36 @@ def dev():
     end                 = time.time()
     duration            = int(end) - int(start)
 
-    print('duration: {}s'.format(str(duration)))
+    print("duration: {}s".format(str(duration)))
 
 
 def testrail_main():
     """Main TestRail entry point."""
-    print('Starting TestRail sync')
+    print("Starting TestRail sync")
 
     start                   = time.time()
     testrail                = TestRail(testrail_config)
     jira                    = JiraBoard(jira_config)
     trello                  = TrelloBoard(trello_config)
+    trello.populate()
 
     TestRailReconciler(testrail, jira, trello, trr_config).reconcile()
 
     end                     = time.time()
     duration                = int(end) - int(start)
 
-    print('duration: {}s'.format(str(duration)))
+    print("duration: {}s".format(str(duration)))
 
 
 def testrail_dev():
     """TestRail development/test entry point."""
-    print('Starting TestRail sync in TEST MODE')
+    print("Starting TestRail sync in TEST MODE")
 
     start                   = time.time()
     testrail                = TestRail(testrail_config)
     jira                    = JiraBoard(jira_config)
     trello                  = TrelloBoard(trello_config, testMode=True)
+    trello.populate()
 
     TestRailReconciler(testrail, jira, trello, trr_config).reconcile()
 

@@ -67,7 +67,11 @@ class GitLabLog:
         with gitlab.Gitlab(repopath, private_token=token) as gl:
             gl.auth()
             gl_project              = gl.projects.get(project_id)
-            commits                 = sorted(gl_project.commits.list(query_parameters=query_params), key=lambda c: c.attributes["committed_date"])
+            commits                 = sorted(gl_project.commits.list(
+                all=True,
+                query_parameters=query_params),
+                key=lambda c: c.attributes["committed_date"]
+            )
 
             for commit in commits:
                 attr = commit.attributes
@@ -98,7 +102,7 @@ class GitLabLog:
         self.lastCommit = get_latest_commit(self.dbPath)
 
         if self.lastCommit is not None:
-            self.query_params["since"] = self.lastCommit[1]
+            self.query_params["since"] = self.lastCommit[2]
 
         else:
             self.query_params["since"] = self.startDate
