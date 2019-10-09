@@ -36,6 +36,7 @@ class JiraBoard:
         self.username       = config["username"]
         self.password       = config["token"]
         self.project_key    = config["project_key"]
+        self.board_name     = config["board_name"]
         self.testMode       = testMode
         self.options        = {"server": self.host}
         self.jira           = JIRA(self.options, auth=(self.username, self.password))
@@ -85,7 +86,7 @@ class JiraBoard:
         """
         if not project_key or project_key is None:
             raise JiraBoardProjectException("Invalid project_key")
-        return next(filter(lambda board: board.name.lower() == "medhub development", self.jira.boards(project_key)), None)
+        return next(filter(lambda board: board.name.lower() == self.board_name, self.jira.boards(project_key)), None)
 
     def getCurrentSprint(self, board_id):
         """Given a board_id, get the current sprint the project is in. Also try and filter out that Moodle shit.
