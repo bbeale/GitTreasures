@@ -91,6 +91,7 @@ try:
     # Trello reconciler config values
     tr_config = dict(
         filter_qa_status    = config["jira"]["filter_qa_status"],
+        filter_qa_ready     = config["jira"]["filter_qa_ready"],
         project_key         = config["jira"]["project_key"],
         jira_pattern        = r"{}".format(config["git"]["jira_pattern"]),
     )

@@ -9,8 +9,9 @@ from src.exceptions import (
 
 from util import get_configs
 
-from jira import JIRA
+from requests.exceptions import HTTPError
 from urllib.parse import urljoin
+from jira import JIRA
 import dateutil.parser
 import json
 import os
@@ -36,16 +37,15 @@ class JiraBoard:
         self.username       = config["username"]
         self.password       = config["token"]
         self.project_key    = config["project_key"]
-        self.board_name     = config["board_name"]
         self.testMode       = testMode
         self.options        = {"server": self.host}
         self.jira           = JIRA(self.options, auth=(self.username, self.password))
-        self.board          = self.getBoard(self.project_key)
-        self.current_sprint = self.getCurrentSprint(self.board.id)
+        self.board          = self.get_board(self.project_key)
+        self.current_sprint = self.get_current_sprint(self.board.id)
         self.raw_issues     = []
         self.stories        = []
 
-    def addNewFilter(self, filter_name, new_query):
+    def add_new_filter(self, filter_name, new_query):
         """Add a new JQL filter to the Jira project.
 
         :param filter_name: name for the filter
@@ -56,9 +56,20 @@ class JiraBoard:
             raise JiraBoardFilterException("Invalid issue_key")
         if not new_query or new_query is None:
             raise JiraBoardFilterException("Invalid or empty query")
-        return self.jira.create_filter(filter_name, jql=new_query)
 
-    def updateFilter(self, filter_id, new_query):
+        result = None
+        try:
+            result = self.jira.create_filter(filter_name, jql=new_query)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira stories.\nRetrying in a few seconds.")
+            try:
+                result = self.jira.create_filter(filter_name, jql=new_query)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira stories.")
+        finally:
+            return result
+
+    def update_filter(self, filter_id, new_query):
         """Update an existing JQL filter associated with the Jira project.
 
         :param filter_id: id for the filter
@@ -69,16 +80,38 @@ class JiraBoard:
             raise JiraBoardIssueException("Invalid filter_id")
         if not new_query or new_query is None:
             raise JiraBoardFilterException("Invalid or empty query")
-        return self.jira.update_filter(filter_id, jql=new_query)
 
-    def getProject(self):
+        result = None
+        try:
+            result = self.jira.update_filter(filter_id, jql=new_query)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to update Jira filter.\nRetrying in a few seconds.")
+            try:
+                result = self.jira.update_filter(filter_id, jql=new_query)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to update Jira filter.")
+        finally:
+            return result
+
+    def get_project(self):
         """Get active Jira project.
 
         :return: JSON object representing entire Jira project, otherwise None
         """
-        return next(filter(lambda proj: proj.key.lower() == self.project_key.lower(), self.jira.projects()), None)
+        projects = None
+        try:
+            projects = self.jira.projects()
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira projects.\nRetrying in a few seconds.")
+            try:
+                projects = self.jira.projects()
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira projects.")
+        finally:
+            # projects = None # test!!!
+            return next(filter(lambda proj: proj.key.upper() == self.project_key, projects), None)
 
-    def getBoard(self, project_key):
+    def get_board(self, project_key):
         """Get active Jira board given a project_key.
 
         :param project_key: Jira project key
@@ -86,9 +119,21 @@ class JiraBoard:
         """
         if not project_key or project_key is None:
             raise JiraBoardProjectException("Invalid project_key")
-        return next(filter(lambda board: board.name.lower() == self.board_name, self.jira.boards(project_key)), None)
 
-    def getCurrentSprint(self, board_id):
+        boards = None
+        try:
+            boards = self.jira.boards(project_key)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira projects.\nRetrying in a few seconds.")
+            try:
+                boards = self.jira.boards(project_key)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira projects.")
+        finally:
+            # boards = None # test!!!
+            return next(filter(lambda board: board.name.lower() == "medhub development", boards), None)
+
+    def get_current_sprint(self, board_id):
         """Given a board_id, get the current sprint the project is in. Also try and filter out that Moodle shit.
 
         :param board_id: ID for the current Jira board
@@ -96,9 +141,36 @@ class JiraBoard:
         """
         if not board_id or board_id is None:
             raise JiraBoardIssueException("Invalid board_id")
-        return next(filter(lambda story: story.state.lower() == "active" and "moodle" not in story.name.lower() and "release sprint" in story.name.lower(), self.jira.sprints(board_id)), None)
+        sprints = None
+        try:
+            sprints = self.jira.sprints(board_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira sprints.\nRetrying in a few seconds.")
+            try:
+                sprints = self.jira.sprints(board_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira sprints.")
+        finally:
+            # boards = None # test!!!
+            return next(filter(lambda story: story.state.lower() == "active" and "moodle" not in story.name.lower() and "release sprint" in story.name.lower(), sprints), None)
 
-    def getIssuesFromFilter(self, filter_id):
+    def get_jql_filter(self, filter_id):
+        if not filter_id or filter_id is None:
+            raise JiraBoardIssueException("Invalid filter_id")
+
+        j_filter = None
+        try:
+            j_filter = self.jira.filter(filter_id)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira filter.\nRetrying in a few seconds.")
+            try:
+                j_filter = self.jira.filter(filter_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira filter.")
+        finally:
+            return j_filter
+
+    def get_issues_from_filter(self, filter_id):
         """Get Jira issues returned by a given JQL filter_id.
 
         :param filter_id: id for the filter
@@ -106,25 +178,45 @@ class JiraBoard:
         """
         if not filter_id or filter_id is None:
             raise JiraBoardIssueException("Invalid filter_id")
-        jql = self.jira.filter(filter_id).jql
-        return self.jira.search_issues(jql, maxResults=100)
 
-    def getStories(self, filter_id):
-        """Seems weirdly like a dupe of getIssueFromFilter(), but if things are working I don't wanna break it right now..
+        jql = self.get_jql_filter(filter_id).jql
+        issues = None
+        try:
+            issues = self.jira.search_issues(jql, maxResults=100)
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get issues from Jira filter.\nRetrying in a few seconds.")
+            try:
+                issues = self.jira.search_issues(jql, maxResults=100)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get issues from Jira filter.")
+        finally:
+            return issues
+
+    def get_issues(self, filter_id):
+        """Seems weirdly like a dupe of get_issues_from_filter(), but if things are working I don't wanna break it right now..
 
         :param filter_id: id for the filter
         :return:
         """
         if not filter_id or filter_id is None:
             raise JiraBoardIssueException("Invalid issue_key")
+
+        issues = None
         if self.testMode:
-            jsonData    = open(os.path.join("testJiraData.json"), "r", encoding="utf-8")
-            issues      = json.loads(jsonData.read())
+            jsonData = open(os.path.join("testJiraData.json"), "r", encoding="utf-8")
+            issues = json.loads(jsonData.read())
         else:
-            issues      = self.getIssuesFromFilter(filter_id)
+            try:
+                issues = self.get_issues_from_filter(filter_id)
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get issues from Jira filter.\nRetrying in a few seconds.")
+                try:
+                    issues = self.get_issues_from_filter(filter_id)
+                except HTTPError as httpe:
+                    print(httpe.response.status_code, "- Failed to get issues from Jira filter.")
         return issues
 
-    def getCurrentStatus(self, issue_key):
+    def get_current_status(self, issue_key):
         """Get the current status for a given Jira story.
 
         :param issue_key: a Jira story key
@@ -132,9 +224,23 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.jira.issue(issue_key, fields="status", expand="changelog").fields.status.name
 
-    def getCurrentStatusCategory(self, issue_key):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is not None:
+                return issue.fields.status.name
+            else:
+                return None
+
+    def get_current_status_category(self, issue_key):
         """Get the status category for a given Jira story.
 
         :param issue_key: a Jira story key
@@ -142,9 +248,23 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.jira.issue(issue_key, fields="status", expand="changelog").fields.status.statusCategory.name
 
-    def getMostRecentStatusChange(self, issue_key):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is not None:
+                return issue.fields.status.statusCategory.name
+            else:
+                return None
+
+    def get_most_recent_status_change(self, issue_key):
         """Get the most recent status change for a Jira story, given it's issue_key.
 
         :param issue_key: a Jira story key
@@ -152,11 +272,23 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        story       = self.jira.issue(issue_key, fields="status", expand="changelog")
-        status      = next(filter(lambda s: s["toString"], story.fields.status.name), None)
-        return status
 
-    def isHotfix(self, issue_key):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is not None:
+                return next(filter(lambda s: s["toString"], issue.fields.status.name), None)
+            else:
+                return None
+
+    def is_hotfix(self, issue_key):
         """Given am issue_key, check if the story is a hotfix.
 
         :param issue_key: a Jira story key
@@ -164,10 +296,33 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
-        return next(filter(lambda l: l.lower() == "hotfix", issue.fields.labels), None) is not None
 
-    def isInStaging(self, issue_key, stories):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is not None:
+                return next(filter(lambda l: l.lower() == "hotfix", issue.fields.labels), None) is not None
+            else:
+                return False
+
+    def isAtomic(self, issue_key):
+        """Given am issue_key, check if the story is from Atomic Object.
+
+        :param issue_key: a Jira story key
+        :return boolean: True if story is from Atomic Object, otherwise False
+        """
+        if not issue_key or issue_key is None:
+            raise JiraBoardIssueException("Invalid issue_key")
+        return "MMDH-" in self.jira.issue(issue_key).key
+
+    def is_in_staging(self, issue_key, stories):
         """Given am issue_key, check if the story is in the staging branch.
 
         :param issue_key: a Jira story key
@@ -184,7 +339,7 @@ class JiraBoard:
             in_staging = issue["in_staging"]
         return in_staging
 
-    def isFreshQaReady(self, issue_key):
+    def is_fresh_qa_ready(self, issue_key):
         """Given am issue_key, check if the story is ready for QA for the very first time.
 
         :param issue_key: a Jira story key
@@ -192,9 +347,14 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.getCurrentStatus(issue_key) == "Ready for QA Release" and not self.hasFailedQA(issue_key)
 
-    def isStaleQaReady(self, issue_key):
+        current_status = self.get_current_status(issue_key)
+        qa_fail = self.has_failed_qa(issue_key)
+        if current_status is None:
+            raise JiraBoardIssueException("No current status found")
+        return current_status == "Ready for QA Release" and not qa_fail
+
+    def is_stale_qa_ready(self, issue_key):
         """Given am issue_key, check if the story is ready for QA after previously failing testing.
 
         :param issue_key: a Jira story key
@@ -202,9 +362,14 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.getCurrentStatus(issue_key) == "Ready for QA Release" and self.hasFailedQA(issue_key)
 
-    def isInQaTesting(self, issue_key):
+        current_status = self.get_current_status(issue_key)
+        qa_fail = self.has_failed_qa(issue_key)
+        if current_status is None:
+            raise JiraBoardIssueException("No current status found")
+        return current_status == "Ready for QA Release" and qa_fail
+
+    def is_in_qa_testing(self, issue_key):
         """Given am issue_key, check if the story is currently in "QA Testing".
 
         :param issue_key: a Jira story key
@@ -212,9 +377,13 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.getCurrentStatus(issue_key) == "QA Testing"
 
-    def hasCompleteStatus(self, issue_key):
+        current_status = self.get_current_status(issue_key)
+        if current_status is None:
+            raise JiraBoardIssueException("No current status found")
+        return current_status == "QA Testing"
+
+    def has_complete_status(self, issue_key):
         """Given am issue_key, check if the story has a "Complete" status category.
 
         :param issue_key: a Jira story key
@@ -222,21 +391,40 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.getCurrentStatusCategory(issue_key) == "Done"
 
-    def passedQA(self, issue_key):
+        current_status_category = self.get_current_status_category(issue_key)
+        if current_status_category is None:
+            raise JiraBoardIssueException("No current status  category found")
+        return current_status_category == "Done"
+
+    def passed_qa(self, issue_key):
         """Given an issue_key, check if the story has passed QA.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a passing status with a valid QA tester, otherwise False
         """
-        story       = self.jira.issue(issue_key, fields="status", expand="changelog")
-        # Let's try this another way
-        statuses    = self.getStatuses(story.changelog.histories)
-        tester      = next(filter(lambda s: s["authorName"] in self.testers, statuses), None)
-        return self.hasCompleteStatus(story.key) and tester is not None
+        if not issue_key or issue_key is None:
+            raise JiraBoardIssueException("Invalid issue_key")
 
-    def hasFailedQA(self, issue_key):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is None:
+                raise JiraBoardIssueException("NoneType issue is not valid.")
+            else:
+                # Let's try this another way
+                statuses = self.get_statuses(issue.changelog.histories)
+                tester = next(filter(lambda s: s["authorName"] in self.testers, statuses), None)
+                return self.has_complete_status(issue.key) and tester is not None
+
+    def has_failed_qa(self, issue_key):
         """Given an issue_key, check if the story has failed QA in the past.
 
         :param issue_key: a Jira story key
@@ -244,17 +432,30 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        story           = self.jira.issue(issue_key, fields="status", expand="changelog")
-        statuses        = self.getStatuses(story.changelog.histories)
 
-        failStatus      = next(filter(
-            lambda status: (status["authorName"] in self.testers)
-            and status["fromString"] == "QA Testing"
-            and status["toString"] == "In Progress", statuses
-        ), None)
-        return True if failStatus is not None else False
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is None:
+                raise JiraBoardIssueException("NoneType issue is not valid.")
+            else:
+                # Let's try this another way
+                statuses = self.get_statuses(issue.changelog.histories)
+                failStatus      = next(filter(
+                    lambda status: (status["authorName"] in self.testers)
+                    and status["fromString"] == "QA Testing"
+                    and status["toString"] == "In Progress", statuses
+                ), None)
+                return True if failStatus is not None else False
 
-    def isCurrentlyFailed(self, issue_key):
+    def is_currently_failed(self, issue_key):
         """Given an issue_key, check if a Jira story currently has a failure status.
 
         :param issue_key: a Jira story key
@@ -262,15 +463,19 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        return self.getCurrentStatus(issue_key) in ["In Progress", "Backlog"]
 
-    def getStatuses(self, change_log):
+        current_status = self.get_current_status(issue_key)
+        if current_status is None:
+            raise JiraBoardIssueException("No current status found")
+        return current_status in ["In Progress", "Backlog"]
+
+    def get_statuses(self, change_log):
         """Get all status changes from a change_log associated with a Jira story.
 
         :param change_log: expanded list of fields returned from Jira API for a single issue
         :return list: a list of dicts representing the status change and it's author
         """
-        if change_log is None:
+        if not change_log or change_log is None:
             raise JiraBoardIssueFieldException("change_log cannot be None")
         return [dict(
             authorName  = ch.author.displayName,
@@ -280,7 +485,7 @@ class JiraBoard:
         ) for ch in change_log if ch.items[0].field.lower() in ["status", "attachment"]]
 
     # TODO: Test this. NEW METHOD!
-    def getSubtasks(self, issue_key):
+    def get_subtasks(self, issue_key):
         """Get subtasks of a Jira story.
 
         :param issue_key: a Jira story key
@@ -288,10 +493,23 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        story = self.jira.issue(issue_key, fields="subtasks")
-        return [task.lower() for task in story.fields.subtasks]
 
-    def getAttachments(self, issue_key):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is None:
+                raise JiraBoardIssueException("NoneType issue is not valid.")
+            else:
+                return [task.lower() for task in issue.fields.subtasks]
+
+    def get_attachments(self, issue_key):
         """Get attachments from a Jira story.
 
         :param issue_key: a Jira story key
@@ -299,10 +517,23 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        story = self.jira.issue(issue_key, fields="attachment")
-        return ["{}secure/attachment/{}/{}".format(self.host, a.id, a.filename) for a in story.fields.attachment]
 
-    def getLabels(self, issue_key):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="attachment", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="attachment", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is None:
+                raise JiraBoardIssueException("NoneType issue is not valid.")
+            else:
+                return ["{}secure/attachment/{}/{}".format(self.host, a.id, a.filename) for a in issue.fields.attachment]
+
+    def get_labels(self, issue_key):
         """Get a list of labels attached to a story by issue_key.
 
         :param issue_key: a Jira story key
@@ -310,10 +541,23 @@ class JiraBoard:
         """
         if not issue_key or issue_key is None:
             raise JiraBoardIssueException("Invalid issue_key")
-        story = self.jira.issue(issue_key, fields="labels")
-        return [label.lower() for label in story.fields.labels]
 
-    def getParsedStories(self, raw_issues):
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
+        except HTTPError as httpe:
+            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
+            except HTTPError as httpe:
+                print(httpe.response.status_code, "- Failed to get Jira issue.")
+        finally:
+            if issue is None:
+                raise JiraBoardIssueException("NoneType issue is not valid.")
+            else:
+                return [label.lower() for label in issue.fields.labels]
+
+    def get_parsed_stories(self, raw_issues):
         """Given a collection of raw Jira stories, parses them down to JSON objects containing needed fields only.
 
         :param raw_issues: JSON collection of stories returned from the Jira API
@@ -331,13 +575,13 @@ class JiraBoard:
 
             _testedBy           = "unassigned"
             _hasFailed          = False
-            _currentStatus      = self.getCurrentStatus(_story.key)
+            _currentStatus      = self.get_current_status(_story.key)
             _changelog          = sorted(_story.changelog.histories, key=lambda ch: ch.created, reverse=True)
-            _statuses           = self.getStatuses(_changelog)
+            _statuses           = self.get_statuses(_changelog)
             _validTester        = next(filter(lambda status: status["authorName"] in self.testers, _statuses), None)
             _testedBy           = _validTester["authorName"] if _validTester is not None else "unassigned"
             _url                = urljoin(self.host, "browse/{}".format(_story.key))
-            _labels             = self.getLabels(_story.key)
+            _labels             = self.get_labels(_story.key)
             _summary            = "".join(re.findall(r'[^*`#\t\'"]', _story.fields.summary))
             _desc               = "".join(re.findall(r'[^*`#\t\'"]', _story.fields.description))
 
@@ -386,7 +630,7 @@ class JiraBoard:
                         s["fromString"],
                         s["toString"],
                         dateutil.parser.parse(s["created"]).strftime("%Y-%m-%d %H:%M")
-                    ) for s in list(filter(lambda status: status["authorName"] in self.testers, self.getStatuses(_changelog)))
+                    ) for s in list(filter(lambda status: status["authorName"] in self.testers, self.get_statuses(_changelog)))
                 ])
 
                 if _movedToQaDate is not None:
@@ -395,9 +639,9 @@ class JiraBoard:
                     raise Exception("No QA date status found")
 
                 _api_url        = urljoin(self.host, "rest/api/2/issue/{}".format(_story.key))
-                _hotfix         = self.isHotfix(_story.key)
+                _hotfix         = self.is_hotfix(_story.key)
                 _inStaging      = False
-                _attachments    = self.getAttachments(_story.key)
+                _attachments    = self.get_attachments(_story.key)
 
                 record = dict(
                     jira_id                 = issue.id,
@@ -423,4 +667,4 @@ class JiraBoard:
                 )
 
             parsed_stories.append(record)
-        return parsed_stories
+        return sorted(parsed_stories, key=lambda story: story["jira_qa_date"])

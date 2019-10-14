@@ -48,10 +48,11 @@ class TrelloReconciler:
         self.jira                   = jira
         self.git                    = git
         self.trello                 = trello
-        self.qa_status_stories      = self.jira.getParsedStories(self.jira.getStories(config["filter_qa_status"]))
-        self.project_key            = config["project_key"]
         self.jira_key_pattern       = config["jira_pattern"]
-        self.jira_qa_statuses       = sorted(self.qa_status_stories, key=lambda story: story["jira_qa_date"])
+        self.filter_qa_status       = config["filter_qa_status"]
+        self.filter_qa_ready        = config["filter_qa_ready"]
+        self.jira_qa_statuses       = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_status))
+        self.jira_qa_ready          = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready))
         self.staging_commits        = self.git.commits
         self.trello_labels          = self.trello.labels
         self.failed_listID          = self.trello.failedListId
@@ -131,7 +132,7 @@ class TrelloReconciler:
         if not trello_card or trello_card is None:
             raise ReconcileTrelloCardException("Invalid Trello card")
 
-        if self.jira.isHotfix(trello_card["name"]):
+        if self.jira.is_hotfix(trello_card["name"]):
             self.trello_addCardLabel(trello_card["id"], "hotfix", color="red")
 
         commit = next(filter(lambda c: trello_card["name"] in c["commitMessage"], self.staging_commits), None)
@@ -186,7 +187,7 @@ class TrelloReconciler:
         """
         if not trello_card or trello_card is None:
             raise ReconcileTrelloCardException("Invalid Trello card")
-        return self.jira.isCurrentlyFailed(trello_card["name"]) and trello_card["listID"] != self.failed_listID
+        return self.jira.is_currently_failed(trello_card["name"]) and trello_card["listID"] != self.failed_listID
 
     def trello_isStaleQaReady(self, trello_card):
         """Check if a Trello card HAS previously failed QA.
@@ -369,6 +370,10 @@ class TrelloReconciler:
                 self.trello_addToList(story, self.complete_listID, self.new_cards)
                 continue
 
+            if self.jira_isInQaTesting(story["jira_key"]):
+                self.trello_addToList(story, self.testing_listID, self.new_cards)
+                continue
+
             if self.jira_isFreshHotfix(story["jira_key"]):
                 self.trello_addToList(story, self.other_listID, self.new_cards)
                 continue
@@ -453,16 +458,18 @@ class TrelloReconciler:
     def trello_addCardsToBoard(self):
         """Actually add cards from the new card list to the Trello board"""
         old_qa_ready    = [li["name"] for li in self.old_qa_ready_cards]
-        new_jira_list   = [li["jira_key"] for li in self.qa_status_stories]
-        current_index   = 0
-        prev_index      = None
-        pos_incr        = None
+        new_qa_ready    = [li["jira_key"] for li in self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready)) if not self.jira_isHotfix(li["jira_key"])]
 
         for card in self.new_cards:
+            if card["jira_key"] not in self._old_card_names:
 
-            if card["trello_listID"] == self.todo_listID and card["jira_key"] not in old_qa_ready:
-                current_index   = new_jira_list.index(card["jira_key"])
-                prev_index      = current_index - 1
+                current_index   = 0
+                prev_index      = None
+
+                if card["trello_listID"] == self.todo_listID:
+                    # Attempting incrementing current to account for the new pos it should be in
+                    current_index   = new_qa_ready.index(card["jira_key"]) + 1
+                    prev_index      = current_index - 1
 
                 if prev_index is None or prev_index < 0:
                     card["pos"]    = "top"
@@ -476,39 +483,41 @@ class TrelloReconciler:
 
                     card["pos"]    = self._last_card_pos
 
-            desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
+                desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
+                            card["jira_summary"],
+                            card["date"],
+                            card["jira_url"],
+                            card["jira_desc"],
+                            card["comments"],
+                            card["statuses"]
+                )
+
+                if len(desc) > 16384:
+                    desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                         card["jira_summary"],
                         card["date"],
                         card["jira_url"],
                         card["jira_desc"],
-                        card["comments"],
-                        card["statuses"]
-            )
+                        "Too much text -- see Jira story",
+                        "Too much text -- see Jira story"
+                    )
 
-            if len(desc) > 16384:
-                desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
-                    card["jira_summary"],
-                    card["date"],
-                    card["jira_url"],
-                    card["jira_desc"],
-                    "Too much text -- see Jira story",
-                    "Too much text -- see Jira story"
-                )
+                try:
+                    newcard = self.trello_addCard(card["jira_key"], card["trello_listID"], card["pos"], desc)
 
-            try:
-                newcard = self.trello_addCard(card["jira_key"], card["trello_listID"], card["pos"], desc)
-                if card["trello_listID"] == self.todo_listID:
-                    old_qa_ready.insert(current_index, newcard["name"])
-                    self.old_qa_ready_cards.insert(current_index, newcard)
+                except UpdateTrelloException as e:
+                    e.msg = "Unable to add a new card to the Trello board"
+                    print(e.msg)
+                    sys.exit(-1)
 
-            except UpdateTrelloException as e:
-                e.msg = "Unable to add a new card to the Trello board"
-                print(e.msg)
-                sys.exit(-1)
+                else:
+                    if card["trello_listID"] == self.todo_listID:
+                        old_qa_ready.insert(current_index, newcard["name"])
+                        self.old_qa_ready_cards.insert(current_index, newcard)
 
-            self.trello_addCardMembers(newcard["id"], card["tested_by"])
-            self.trello_addCardLabels(newcard, card["labels"])
-            self.trello_addCardAttachments(newcard["id"], card["jira_attachments"])
+                    self.trello_addCardMembers(newcard["id"], card["tested_by"])
+                    self.trello_addCardLabels(newcard, card["labels"])
+                    self.trello_addCardAttachments(newcard["id"], card["jira_attachments"])
 
     # Jira methods
     def jira_getStories(self, jira, filterID):
@@ -522,10 +531,20 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.getLabels(jira_key)
+        return self.jira.get_labels(jira_key)
 
     def jira_initializeData(self):
         raise NotImplementedError
+
+    def jira_isHotfix(self, jira_key):
+        """Return True if item is a hotfix.
+
+        :param jira_key: jira_key of the story we want to check
+        :return boolean:
+        """
+        if not jira_key or jira_key is None:
+            raise ReconcileJiraStoryException("Invalid jira_key")
+        return self.jira.is_hotfix(jira_key)
 
     def jira_isFreshHotfix(self, jira_key):
         """Return True if item is a hotfix, is ready for QA, and has NOT previously failed testing.
@@ -535,7 +554,7 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.isHotfix(jira_key) and self.jira.isFreshQaReady(jira_key)
+        return self.jira_isHotfix(jira_key) and self.jira_isFreshQaReady(jira_key)
 
     def jira_isStaleHotfix(self, jira_key):
         """Return True if item is a hotfix, is ready for QA and HAS previously failed testing.
@@ -545,7 +564,7 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.isHotfix(jira_key) and self.jira.isStaleQaReady(jira_key)
+        return self.jira_isHotfix(jira_key) and self.jira_isStaleQAReady(jira_key)
 
     def jira_isFreshQaReady(self, jira_key):
         """Return True if item is ready for QA, and has NOT previously failed testing.
@@ -555,7 +574,7 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.isFreshQaReady(jira_key)
+        return self.jira.is_fresh_qa_ready(jira_key)
 
     def jira_isStaleQAReady(self, jira_key):
         """Return True if item is ready for QA and HAS previously failed testing.
@@ -565,7 +584,7 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.isStaleQaReady(jira_key)
+        return self.jira.is_stale_qa_ready(jira_key)
 
     def jira_keyInCommitMesssage(self, jira_key, commit_message):
         """Return True if a commit message is found with the Jira key. This is used to indicate commits with work done pertaining to development stories.
@@ -601,7 +620,7 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.isInQaTesting(jira_key)
+        return self.jira.is_in_qa_testing(jira_key)
 
     def jira_passedQA(self, jira_key):
         """Return true if story has passed QA.
@@ -611,7 +630,7 @@ class TrelloReconciler:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        return self.jira.passedQA(jira_key)
+        return self.jira.passed_qa(jira_key)
 
     def jira_isOtherItem(self, jira_key):
         """Final check to see if story should go to Trello. Make sure story was nowhere on Trello board prior to reconciling.

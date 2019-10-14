@@ -27,7 +27,7 @@ def main():
 
     trello = TrelloBoard(trello_config)
 
-    exportCardsToJson(trello)
+    export_cards_to_json(trello)
 
     return
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     main()
 
 
-def exportCardsToJson(trelloboard):
+def export_cards_to_json(trelloboard):
 
     if len(trelloboard.cards) < 1:
         print('\tNo cards found')
@@ -51,8 +51,8 @@ def exportCardsToJson(trelloboard):
             cardsFromList = trelloboard.trello.lists.get_card(l['id'])
             for card in cardsFromList:
                 cards.append({
-                    "listID": list["id"],
-                    "listName": list["name"],
+                    "listID": l["id"],
+                    "listName": l["name"],
                     "id": card["id"],
                     "name": card["name"],
                     "cardDesc": card["desc"]

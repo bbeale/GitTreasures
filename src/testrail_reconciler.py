@@ -13,6 +13,7 @@ from util import get_configs
 
 import datetime
 import sys
+import os
 
 
 class TestRailReconciler:
@@ -39,7 +40,7 @@ class TestRailReconciler:
         self.jira               = jira
         self.trello             = trello
 
-        self.jira_project       = self.jira_getProject(self.jira)
+        self.jira_project       = self.jira_getProject()
         self.jira_board         = self.jira_getBoard(self.jira)
         self.current_release    = self.jira_getCurrentSprint(self.jira, self.jira_board.id)
         self.last_week          = self.jira_getStories(self.jira, config["filter_last_week"])
@@ -68,28 +69,26 @@ class TestRailReconciler:
             self.trello.add_new_label(card["id"], "regressiontests", color="purple")
 
     # Jira methods
-    def jira_getProject(self, jira):
+    def jira_getProject(self):
         """Get the current project from JiraBoard instance.
 
-        :param jira:
         :return: the current project if it exists, None if not
         """
-        if not jira or jira is None:
+        if not self.jira or self.jira is None:
             raise ReconcileJiraBoardException("Invalid JiraBoard object")
-        return jira.getProject()
+        return self.jira.get_project()
 
-    def jira_getBoard(self, jira, key=None):
+    def jira_getBoard(self, key=None):
         """Get the current board from the current project on the instance.
 
-        :param jira:
         :param key:
         :return: the board if it exists, None if not
         """
-        if not jira or jira is None:
+        if not self.jira or self.jira is None:
             raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if key is None:
-            key = jira.getProject()
-        return jira.getBoard(key)
+            key = self.jira_getProject()
+        return self.jira.get_board(key)
 
     def jira_getCurrentSprint(self, jira, board_id):
         """Get the current sprint (and probably some Moodle bullshit becasue they are too incompetent to make their own Jira project...).
@@ -102,7 +101,7 @@ class TestRailReconciler:
             raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if not board_id or board_id is None:
             raise ReconcileJiraBoardException("Invalid board ID")
-        return jira.getCurrentSprint(board_id)
+        return jira.get_current_sprint(board_id)
 
     def jira_getStories(self, jira, filter_id):
         """Get a list of Jira stories given the ID of a JQL filter.
@@ -115,7 +114,7 @@ class TestRailReconciler:
             raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if not filter_id or filter_id is None:
             raise ReconcileJiraBoardException("Invalid filter ID")
-        return jira.getParsedStories(jira.getStories(filter_id))
+        return jira.get_parsed_stories(jira.get_issues(filter_id))
 
     def jira_updateFilter(self, jira, filter_id, query):
         """Update the query used by a JQL filter.
@@ -131,7 +130,7 @@ class TestRailReconciler:
             raise ReconcileJiraBoardException("Invalid filter ID")
         if not query or query is None:
             raise ReconcileJiraBoardException("Invalid query")
-        return jira.updateFilter(filter_id, query)
+        return jira.update_filter(filter_id, query)
 
     def jira_newFilter(self, jira, name, query):
         """Create a new JQL filter.
@@ -147,7 +146,7 @@ class TestRailReconciler:
             raise ReconcileJiraBoardException("Invalid name")
         if not query or query is None:
             raise ReconcileJiraBoardException("Invalid query")
-        return jira.addNewFilter(name, query)
+        return jira.add_new_filter(name, query)
 
     # TestRail methods
     def testrail_suiteExists(self, jira_key, project_id):

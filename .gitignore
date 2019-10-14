@@ -1,6 +1,7 @@
 .idea/*
 data/*
 repos/*
+.gitignore
 *pycache*
 *.pyc
 *pytest_cache*
