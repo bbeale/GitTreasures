@@ -288,26 +288,25 @@ class TrelloReconciler:
                     jira["git_commit_message"] = commit["commitMessage"]
                     jira["in_staging"] = True
 
-            else:
-                if self.trello_passedQA(card):
-                    self.trello_copyCard(card, self.complete_listID)
-                    continue
+            if self.trello_passedQA(card):
+                self.trello_copyCard(card, self.complete_listID)
+                continue
 
-                if self.trello_isCurrentlyFailed(card):
-                    self.trello_copyCard(card, self.failed_listID)
-                    continue
+            if self.trello_isCurrentlyFailed(card):
+                self.trello_copyCard(card, self.failed_listID)
+                continue
 
-                jira_labels = self.jira_getLabels(card["name"])
-                if len(jira_labels) > len(card["labels"]):
-                    self.trello_addCardLabels(card, jira_labels)
+            jira_labels = self.jira_getLabels(card["name"])
+            if len(jira_labels) > len(card["labels"]):
+                self.trello_addCardLabels(card, jira_labels)
 
-                if self.trello_isStaleQaReady(card):
-                    self.trello_copyCard(card, self.todo_listID)
-                    continue
+            if self.trello_isStaleQaReady(card):
+                self.trello_copyCard(card, self.todo_listID)
+                continue
 
-                if self.trello_isInQaTesting(card):
-                    self.trello_copyCard(card, self.testing_listID)
-                    continue
+            if self.trello_isInQaTesting(card):
+                self.trello_copyCard(card, self.testing_listID)
+                continue
 
     def trello_getOldLists(self):
         """Generate a list of previously existing cards before reconciling.
@@ -367,27 +366,27 @@ class TrelloReconciler:
         for story in jira_stories:
             # shouldn't happen by this point, but just in case...
             if self.jira_passedQA(story["jira_key"]):
-                self.trello_addToList(story, self.complete_listID, self.new_cards)
+                self.trello_addToList(story, self.complete_listID)
                 continue
 
             if self.jira_isInQaTesting(story["jira_key"]):
-                self.trello_addToList(story, self.testing_listID, self.new_cards)
+                self.trello_addToList(story, self.testing_listID)
                 continue
 
             if self.jira_isFreshHotfix(story["jira_key"]):
-                self.trello_addToList(story, self.other_listID, self.new_cards)
+                self.trello_addToList(story, self.other_listID)
                 continue
 
             if self.jira_isStaleHotfix(story["jira_key"]):
-                self.trello_addToList(story, self.todo_listID, self.new_cards, top_of_list=True)
+                self.trello_addToList(story, self.todo_listID, top_of_list=True)
                 continue
 
             if self.jira_isFreshQaReady(story["jira_key"]):
-                self.trello_addToList(story, self.todo_listID, self.new_cards)
+                self.trello_addToList(story, self.todo_listID)
                 continue
 
             if self.jira_isStaleQAReady(story["jira_key"]):
-                self.trello_addToList(story, self.todo_listID, self.new_cards, top_of_list=True)
+                self.trello_addToList(story, self.todo_listID, top_of_list=True)
                 continue
 
             commit = next(filter(lambda c: story["jira_key"] in c["commitMessage"], self.staging_commits), None)
@@ -397,18 +396,17 @@ class TrelloReconciler:
                     story["git_commit_message"] = commit["commitMessage"]
                     story["in_staging"] = True
 
-                    self.trello_addToList(story, self.todo_listID, self.new_cards, commit_date=commit["committerDate"])
+                    self.trello_addToList(story, self.todo_listID, commit_date=commit["committerDate"])
                     continue
 
             if self.jira_isOtherItem(story["jira_key"]):
-                self.trello_addToList(story, self.todo_listID, self.new_cards)
+                self.trello_addToList(story, self.todo_listID)
 
-    def trello_addToList(self, jira_story, trello_listId, trello_list, top_of_list=False, commit_date=None):
+    def trello_addToList(self, jira_story, trello_listId, top_of_list=False, commit_date=None):
         """Add an individual story's data to a list of card to add to Trello.
 
         :param jira_story: Jira story object to make a Trello card from
         :param trello_listId: list_id of a Trello list getting the new card
-        :param trello_list: list of data from which to make Trello cards
         :param top_of_list: if True, put the new card at the top of the list
         :param commit_date: date that a commit mentioning jira_story was made to staging
             - this will be used for sorting
@@ -419,9 +417,6 @@ class TrelloReconciler:
 
         if not trello_listId or trello_listId is None:
             raise ReconcileTrelloListException("Invalid Trello list ID")
-
-        if trello_list is None:
-            raise ReconcileTrelloListException("Getting rid of the trello_list arg in this method soon... Stay tuned.")
 
         if commit_date and commit_date is not None:
             sort_date = commit_date
