@@ -482,7 +482,7 @@ class JiraBoard:
             created     = ch.created,
             fromString  = ch.items[0].fromString,
             toString    = ch.items[0].toString
-        ) for ch in change_log if ch.items[0].field.lower() in ["status", "attachment"]]
+        ) for ch in change_log if ch.items[0].field.lower() == "status"]
 
     # TODO: Test this. NEW METHOD!
     def get_subtasks(self, issue_key):
@@ -625,12 +625,12 @@ class JiraBoard:
                 ])
 
                 _statuses       = "\n".join([
-                    "_**{}**_:\n\nFrom {} to {} at {}".format(
+                    "_**{}**_:\n\nFrom {} to {} at {}\n\n".format(
                         s["authorName"],
                         s["fromString"],
                         s["toString"],
                         dateutil.parser.parse(s["created"]).strftime("%Y-%m-%d %H:%M")
-                    ) for s in list(filter(lambda status: status["authorName"] in self.testers, self.get_statuses(_changelog)))
+                    ) for s in _statuses
                 ])
 
                 if _movedToQaDate is not None:
