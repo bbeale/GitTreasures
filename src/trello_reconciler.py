@@ -275,39 +275,39 @@ class TrelloReconciler:
         for card in cardList:
 
             jira    = next(filter(lambda j: j["jira_key"] == card["name"], self.jira_qa_statuses), None)
-            if jira is None:
-                continue    # Keep failed card on the board, even though this could also keep complete
+            if jira is not None:
 
-            member  = next(filter(lambda t: jira and jira["tested_by"] == t, self.testers), None)
-            if member is not None and len(card["members"]) == 0:
-                self.trello_addCardMembers(card["id"], member)
+                member  = next(filter(lambda t: jira and jira["tested_by"] == t, self.testers), None)
+                if member is not None and len(card["members"]) == 0:
+                    self.trello_addCardMembers(card["id"], member)
 
-            commit = next(filter(lambda c: jira["jira_key"] in c["commitMessage"], self.staging_commits), None)
-            if commit and commit is not None and self.jira_isStagingStory(jira["jira_key"], commit["commitMessage"]):
+                commit = next(filter(lambda c: jira["jira_key"] in c["commitMessage"], self.staging_commits), None)
+                if commit and commit is not None and self.jira_isStagingStory(jira["jira_key"], commit["commitMessage"]):
 
-                jira["last_known_commit_date"] = commit["committerDate"]
-                jira["git_commit_message"] = commit["commitMessage"]
-                jira["in_staging"] = True
+                    jira["last_known_commit_date"] = commit["committerDate"]
+                    jira["git_commit_message"] = commit["commitMessage"]
+                    jira["in_staging"] = True
 
-            jira_labels = self.jira_getLabels(card["name"])
-            if len(jira_labels) > len(card["labels"]):
-                self.trello_addCardLabels(card, jira_labels)
+            else:
+                if self.trello_passedQA(card):
+                    self.trello_copyCard(card, self.complete_listID)
+                    continue
 
-            if self.trello_isCurrentlyFailed(card):
-                self.trello_copyCard(card, self.failed_listID)
-                continue
+                if self.trello_isCurrentlyFailed(card):
+                    self.trello_copyCard(card, self.failed_listID)
+                    continue
 
-            if self.trello_isStaleQaReady(card):
-                self.trello_copyCard(card, self.todo_listID)
-                continue
+                jira_labels = self.jira_getLabels(card["name"])
+                if len(jira_labels) > len(card["labels"]):
+                    self.trello_addCardLabels(card, jira_labels)
 
-            if self.trello_isInQaTesting(card):
-                self.trello_copyCard(card, self.testing_listID)
-                continue
+                if self.trello_isStaleQaReady(card):
+                    self.trello_copyCard(card, self.todo_listID)
+                    continue
 
-            if self.trello_passedQA(card):
-                self.trello_copyCard(card, self.complete_listID)
-                continue
+                if self.trello_isInQaTesting(card):
+                    self.trello_copyCard(card, self.testing_listID)
+                    continue
 
     def trello_getOldLists(self):
         """Generate a list of previously existing cards before reconciling.
