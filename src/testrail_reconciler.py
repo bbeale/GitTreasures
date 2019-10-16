@@ -35,28 +35,17 @@ class TestRailReconciler:
 
         print("Grabbing stories from Jira that need regression tests...")
 
-        # self.testers            = [Scott, Ben, Ranjeetha, Sandhya]
         self.testrail           = testrail
         self.jira               = jira
         self.trello             = trello
 
         self.jira_project       = self.jira_getProject()
-        self.jira_board         = self.jira_getBoard(self.jira)
-        self.current_release    = self.jira_getCurrentSprint(self.jira, self.jira_board.id)
-        self.last_week          = self.jira_getStories(self.jira, config["filter_last_week"])
-        self.done_this_release  = self.jira_getStories(self.jira, config["filter_this_release"])
+        self.jira_board         = self.jira_getBoard()
+        self.current_release    = self.jira_getCurrentSprint(self.jira_board.id)
+        self.last_week          = self.jira_getStories(config["filter_last_week"])
+        self.done_this_release  = self.jira_getStories(config["filter_this_release"])
 
         self.created_suites     = []
-
-        try:
-            pname = self.current_release.name.split("Sprint")[0].strip()
-            self.testrail_project_name = "{} Regression Tests".format(pname)
-        except ReconcileTestRailException as e:
-            e.msg = "current_release undefined. Unable to determine project name from TestRail."
-            print(e.msg)
-            sys.exit(-1)
-
-        self.testrail_project = self.testrail_getProject(self.testrail_project_name)
 
     def trello_labelRegressionTests(self, card):
         """Add a label to regression test card on Trello board.
@@ -68,14 +57,57 @@ class TestRailReconciler:
         if card["name"] in self.trello.cards:
             self.trello.add_new_label(card["id"], "regressiontests", color="purple")
 
+    def trello_addCard(self, card_name, list_id, desc, pos):
+        """Add a card to the Trello board.
+
+        :param card_name:
+        :param list_id:
+        :param desc:
+        :param pos:
+        :return:
+        """
+        return self.trello.add_new_card(card_name, list_id, desc, pos)
+
+    def trello_populate(self):
+
+        self.trello_checkitems = self.testrail_populateSections(self.testrail_project["id"], self.last_week)
+        cardName = "{} {}".format(self.testrail_project_name, datetime.date.today().strftime("%Y-%m-%d"))
+        card = next(filter(lambda c: c["name"] == cardName, [card for card in self.trello.cards]), None)
+
+        if card is None:
+            # Add the new card
+            cardtext = "Weekly Regression testing for stories that have passed QA over the period of the last 7 days."
+            newCard = self.trello_addCard(cardName, self.trello.otherListId, "top", cardtext)
+
+            # Add labels to the new card
+            self.trello.add_new_label(newCard["id"], "regressiontests", color="purple")
+
+            # Add all QA testers to the new card
+            for trello_testerID in [t["trello_id"] for t in self.testers if "trello_id" in t.keys()]:
+                self.trello.add_new_member(newCard["id"], trello_testerID)
+
+            # Add checklist of stories to the card
+            checklist = self.trello.add_new_checklist(newCard["id"])
+            for ts in self.trello_checkitems:
+                self.trello.add_new_checklist_item(newCard["id"], checklist["id"], ts["name"])
+
+        else:
+            # Check for a checklist on the existing card. If it doesn't exist, add it
+            checklist = self.trello.get_checklist(card["id"])
+            if checklist is None or len(checklist) is 0:
+                checklist = self.trello.add_new_checklist(card["id"])
+
+            # Add stories to the checklist if they aren't already there
+            for ts in self.trello_checkitems:
+                if ts["name"] not in self.trello.get_checklist_items(checklist["id"]):
+                    self.trello.add_new_checklist_item(card["id"], checklist["id"], ts["name"])
+
     # Jira methods
     def jira_getProject(self):
         """Get the current project from JiraBoard instance.
 
         :return: the current project if it exists, None if not
         """
-        if not self.jira or self.jira is None:
-            raise ReconcileJiraBoardException("Invalid JiraBoard object")
         return self.jira.get_project()
 
     def jira_getBoard(self, key=None):
@@ -84,69 +116,55 @@ class TestRailReconciler:
         :param key:
         :return: the board if it exists, None if not
         """
-        if not self.jira or self.jira is None:
-            raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if key is None:
-            key = self.jira_getProject()
+            key = self.jira.get_project()
         return self.jira.get_board(key)
 
-    def jira_getCurrentSprint(self, jira, board_id):
+    def jira_getCurrentSprint(self, board_id):
         """Get the current sprint (and probably some Moodle bullshit becasue they are too incompetent to make their own Jira project...).
 
-        :param jira:
         :param board_id: board ID of the Jira board
         :return: the current sprint if one exists that matches criteria
         """
-        if not jira or jira is None:
-            raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if not board_id or board_id is None:
             raise ReconcileJiraBoardException("Invalid board ID")
-        return jira.get_current_sprint(board_id)
+        return self.jira.get_current_sprint(board_id)
 
-    def jira_getStories(self, jira, filter_id):
+    def jira_getStories(self, filter_id):
         """Get a list of Jira stories given the ID of a JQL filter.
 
-        :param jira:
         :param filter_id: filter ID of the JQL filter (defined in Jira)
         :return: list of stories returned by the filter
         """
-        if not jira or jira is None:
-            raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if not filter_id or filter_id is None:
             raise ReconcileJiraBoardException("Invalid filter ID")
-        return jira.get_parsed_stories(jira.get_issues(filter_id))
+        return self.jira.get_parsed_stories(self.jira.get_issues(filter_id))
 
-    def jira_updateFilter(self, jira, filter_id, query):
+    def jira_updateFilter(self, filter_id, query):
         """Update the query used by a JQL filter.
 
-        :param jira:
         :param filter_id: filter ID of the JQL filter (defined in Jira)
         :param query: new JQL query string
         :return: JSON representation of the filter
         """
-        if not jira or jira is None:
-            raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if not filter_id or filter_id is None:
             raise ReconcileJiraBoardException("Invalid filter ID")
         if not query or query is None:
             raise ReconcileJiraBoardException("Invalid query")
-        return jira.update_filter(filter_id, query)
+        return self.jira.update_filter(filter_id, query)
 
-    def jira_newFilter(self, jira, name, query):
+    def jira_newFilter(self, name, query):
         """Create a new JQL filter.
 
-        :param jira:
         :param name: name of the new JQL filter
         :param query: JQL query string
         :return: JSON representation of the filter
         """
-        if not jira or jira is None:
-            raise ReconcileJiraBoardException("Invalid JiraBoard object")
         if not name or name is None:
             raise ReconcileJiraBoardException("Invalid name")
         if not query or query is None:
             raise ReconcileJiraBoardException("Invalid query")
-        return jira.add_new_filter(name, query)
+        return self.jira.add_new_filter(name, query)
 
     # TestRail methods
     def testrail_suiteExists(self, jira_key, project_id):
@@ -211,51 +229,54 @@ class TestRailReconciler:
     def testrail_addToTestPlan(self, planID, item, ):
         raise NotImplementedError
 
-    def reconcile(self):
-        """Add Jira stories in need of regression tests to TestRail, and make a card with them to add to Trello."""
-        # TestRail
-        if self.testrail_project is None:
-            self.testrail_project = self.testrail.addProject(self.testrail_project_name)
+    def testrail_addTestSuite(self, test_suite):
+        """Add a test suite to the current project.
 
-        self.testrail_suites = self.testrail_populateSections(self.testrail_project["id"], self.done_this_release)
+        :param test_suite:
+        :return:
+        """
+        self.created_suites.append(
+            self.testrail.addTestSuite(
+                self.testrail_project["id"],
+                test_suite["name"],
+                test_suite["announcement"]
+            ))
 
-        for ts in self.testrail_suites:
-            if not self.testrail_suiteExists(ts["jira_key"], self.testrail_project["id"]):
+    def testrail_populateTestSuites(self, test_suites):
+        """Add a list of test suites to the current project using self.testrail_addTestSuite
 
-                self.created_suites.append(
-                    self.testrail.addTestSuite(
-                        self.testrail_project["id"],
-                        ts["name"],
-                        ts["announcement"]
-                    ))
+        :param test_suites:
+        :return:
+        """
+        for suite in test_suites:
+            if not self.testrail_suiteExists(suite["jira_key"], self.testrail_project["id"]):
+                self.testrail_addTestSuite(suite)
 
-        # Trello
-        self.trello_checkitems = self.testrail_populateSections(self.testrail_project["id"], self.last_week)
-        cardName = "{} {}".format(self.testrail_project_name, datetime.date.today().strftime("%Y-%m-%d"))
-        card = next(filter(lambda c: c["name"] == cardName, [card for card in self.trello.cards]), None)
-
-        if card is None:
-
-            newCard = self.trello.add_new_card(cardName, self.trello.otherListId, "top",
-                                             "Weekly Regression testing for stories that have passed QA over the period of the last 7 days.")
-
-
-            self.trello.add_new_label(newCard["id"], "regressiontests", color="purple")
-
-            for trello_testerID in [t["trello_id"] for t in self.testers if "trello_id" in t.keys()]:
-                self.trello.add_new_member(newCard["id"], trello_testerID)
-
-            checklist = self.trello.add_new_checklist(newCard["id"])
-            for ts in self.trello_checkitems:
-                self.trello.add_new_checklist_item(newCard["id"], checklist["id"], ts["name"])
+    def testrail_populate(self):
+        """Populate TestRail project and test suites.
+        Steps:
+            1) try to get the project name from the current Jira sprint
+            2) if a project doesnt't exist by our name, create it
+            3) add test sections to TestRail project
+            4) add test suites to TestRail
+        """
+        try:
+            pname = self.current_release.name.split("Sprint")[0].strip()
+        except ReconcileTestRailException:
+            print("current_release undefined. Unable to determine project name from TestRail.")
+            sys.exit(-1)
 
         else:
-            checklist = self.trello.get_checklist(card["id"])
-            if checklist is None or len(checklist) is 0:
-                checklist = self.trello.add_new_checklist(card["id"])
+            self.testrail_project_name = "{} Regression Tests".format(pname)
+            self.testrail_project = self.testrail_getProject(self.testrail_project_name)
+            if self.testrail_project is None:
+                self.testrail_project = self.testrail.addProject(self.testrail_project_name)
 
-            for ts in self.trello_checkitems:
-                if ts["name"] not in self.trello.get_checklist_items(checklist["id"]):
-                    self.trello.add_new_checklist_item(card["id"], checklist["id"], ts["name"])
+            self.testrail_suites = self.testrail_populateSections(self.testrail_project["id"], self.done_this_release)
 
-        print("\tDone")
+            self.testrail_populateTestSuites(self.testrail_suites)
+
+    def reconcile(self):
+        """Add Jira stories in need of regression tests to TestRail, and make a card with them to add to Trello."""
+        self.testrail_populate()
+        self.trello_populate()
