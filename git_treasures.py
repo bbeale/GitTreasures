@@ -25,7 +25,7 @@ parser = ArgumentParser()
 # use a different entrypoint based on CLI args
 parser.add_argument("--dev", help="Run the development version of the script")
 parser.add_argument("--testrail", help="Run the TestRail integration")
-parser.add_argument("--testrail-dev", help="Run the test version of the TestRail integration")
+parser.add_argument("--testrail-dev", help="Run the dev version of the TestRail integration")
 parser.add_argument("--gitlab", help="Run the GitLab version of the script")
 parser.add_argument("--gitlab-dev", help="Run the GitLab development version of the script")
 parser.add_argument("--github", help="Run the GitHub version of the script")
