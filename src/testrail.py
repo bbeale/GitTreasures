@@ -10,6 +10,9 @@ from src.exceptions import (
     TestRailSuiteModeException
 )
 
+from urllib import error as E
+import time
+
 
 class TestRail:
     """Interface with the TestRail API. Data grabbed here and methods defined here will be used in TestRailReconciler."""
@@ -49,11 +52,33 @@ class TestRail:
         """
         if not project_id or project_id is None:
             raise TestRailProjectException("Invalid project_id")
-        return self.client.send_get("get_project/{}".format(project_id))
+        result = None
+        try:
+            result = self.client.send_get("get_project/{}".format(project_id))
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get project. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_project/{}".format(project_id))
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get project.")
+        finally:
+            return result
 
     def getProjects(self):
         """Get all projects from the TestRail API."""
-        return self.client.send_get("get_projects")
+        result = None
+        try:
+            result = self.client.send_get("get_projects")
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get projects. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_projects")
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get projects.")
+        finally:
+            return result
 
     def getTestCases(self, project_id):
         """Get a list of test cases associated with a given project_id.
@@ -63,7 +88,18 @@ class TestRail:
         """
         if not project_id or project_id is None:
             raise TestRailProjectException("Invalid project_id")
-        return self.client.send_get("get_cases/{}".format(project_id))[0]
+        result = None
+        try:
+            result = self.client.send_get("get_cases/{}".format(project_id))[0]
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get test cases. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_cases/{}".format(project_id))[0]
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get test cases.")
+        finally:
+            return result
 
     def getTestSuites(self, project_id):
         """Get a list of test suites associated with a given project_id.
@@ -73,7 +109,18 @@ class TestRail:
         """
         if not project_id or project_id is None:
             raise TestRailProjectException("Invalid project_id")
-        return self.client.send_get("get_suites/{}".format(project_id))
+        result = None
+        try:
+            result = self.client.send_get("get_suites/{}".format(project_id))
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get test suites. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_suites/{}".format(project_id))
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get test suites.")
+        finally:
+            return result
 
     def getSection(self, project_id, suite_id):
         """Get test section from a test suite by suite_id.
@@ -86,7 +133,18 @@ class TestRail:
             raise TestRailProjectException("Invalid project_id")
         if not suite_id or suite_id is None:
             raise TestRailSuiteException("Invalid suite_id")
-        return self.client.send_get("get_sections/{}&suite_id={}".format(project_id, suite_id))
+        result = None
+        try:
+            result = self.client.send_get("get_sections/{}&suite_id={}".format(project_id, suite_id))
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get test sections. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_sections/{}&suite_id={}".format(project_id, suite_id))
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get test sections.")
+        finally:
+            return result
 
     def getUser(self, user_id):
         """Get a TestRail user by user_id.
@@ -96,14 +154,36 @@ class TestRail:
         """
         if not user_id or user_id is None:
             raise TestRailUserException("Invalid user_id")
-        return self.client.send_get("get_user/{}".format(user_id))
+        result = None
+        try:
+            result = self.client.send_get("get_user/{}".format(user_id))
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get user. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_user/{}".format(user_id))
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get user.")
+        finally:
+            return result
 
     def getUsers(self):
         """Get a list of TestRail users.
 
         :return: response from TestRail API containing the user collection
         """
-        return self.client.send_get("get_users")
+        result = None
+        try:
+            result = self.client.send_get("get_users")
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to get users. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_get("get_users")
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to get users.")
+        finally:
+            return result
 
     def addProject(self, name, announcement=None, show_announcement=True, suite_mode=3):
         """Add a new project to TestRail.
@@ -122,7 +202,18 @@ class TestRail:
             show_announcement   = show_announcement,
             suite_mode          = suite_mode
         )
-        return self.client.send_post("add_project", proj_data)
+        result = None
+        try:
+            result = self.client.send_post("add_project", proj_data)
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to add project. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_post("add_project", proj_data)
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to add project.")
+        finally:
+            return result
 
     def addTestSuite(self, project_id, name, description):
         """Add a new test suite to a TestRail project.
@@ -139,7 +230,18 @@ class TestRail:
         if not description or description is None:
             raise TestRailNewEntityException("Invalid description. Unable to add test suite.")
         data = dict(name=name, description=description)
-        return self.client.send_post("add_suite/{}".format(project_id), data)
+        result = None
+        try:
+            result = self.client.send_post("add_suite/{}".format(project_id), data)
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to add test suite. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_post("add_suite/{}".format(project_id), data)
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to add test suite.")
+        finally:
+            return result
 
     def addSection(self, project_id, name, description, suite_id=None, parent_id=None):
         """Add a new section to a test suite.
@@ -171,7 +273,18 @@ class TestRail:
             if parent_id is not None:
                 sect_data["parent_id"] = parent_id
 
-            return self.client.send_post("add_section/{}".format(project_id), sect_data)
+            result = None
+            try:
+                result = self.client.send_post("add_section/{}".format(project_id), sect_data)
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to add section. Retrying")
+                time.sleep(3)
+                try:
+                    result = self.client.send_post("add_section/{}".format(project_id), sect_data)
+                except E.HTTPError as httpe:
+                    print(httpe, "- Failed to add section.")
+            finally:
+                return result
 
     def addTestCase(self, section_id, title, type_id):
         """Add a test case to a project.
@@ -191,4 +304,15 @@ class TestRail:
             title           = title,
             type_id         = type_id,
         )
-        return self.client.send_post("add_case/{}".format(section_id), test_case_data)
+        result = None
+        try:
+            result = self.client.send_post("add_case/{}".format(section_id), test_case_data)
+        except E.HTTPError as httpe:
+            print(httpe, "- Failed to add test case. Retrying")
+            time.sleep(3)
+            try:
+                result = self.client.send_post("add_case/{}".format(section_id), test_case_data)
+            except E.HTTPError as httpe:
+                print(httpe, "- Failed to add test case.")
+        finally:
+            return result
