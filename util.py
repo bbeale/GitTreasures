@@ -7,8 +7,6 @@ from src.exceptions import (
 
 import configparser
 import sqlite3
-import pprint
-import time
 import json
 import sys
 import os
@@ -211,11 +209,10 @@ def git_db_setup(db_path, ):
     if not db_path or db_path is None:
         raise DbPathException("Database path required for this operation")
 
-    # I forget what this is... # TODO: Look into it
-    # if 'task_scripts' in os.path.join(__file__):
-    #     print(__file__)
-    #     print(usage)
-    #     sys.exit(-1)
+    # Make sure we aren't running inside task_scripts
+    if 'task_scripts' in os.path.join(__file__):
+        print(__file__, "must not be in task_scripts/")
+        sys.exit(-1)
 
     dbpath = os.path.join('data', 'git_treasures.db')
 
