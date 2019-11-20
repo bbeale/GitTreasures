@@ -60,7 +60,6 @@ class TrelloReconciler:
         self.todo_listID            = self.trello.todoListId
         self.testing_listID         = self.trello.testingListId
         self.complete_listID        = self.trello.completeListId
-        self._old_complete_names    = []
         self._old_card_names        = []
         self.old_qa_ready_cards     = []
         self.new_cards              = []
@@ -135,11 +134,8 @@ class TrelloReconciler:
         if self.jira.is_hotfix(trello_card["name"]):
             self.trello_addCardLabel(trello_card["id"], "hotfix", color="red")
 
-        commit = next(filter(lambda c: trello_card["name"] in c["commitMessage"], self.staging_commits), None)
-
-        if commit is not None:
-            if self.jira_isStagingStory(trello_card["name"], commit["commitMessage"]):
-                self.trello_addCardLabel(trello_card["id"], "staging", color="green")
+        if self.jira_isStagingStory(trello_card["name"]):
+            self.trello_addCardLabel(trello_card["id"], "staging", color="green")
 
         for label in trello_labels:
             if label.lower() != "hotfix":
@@ -281,12 +277,14 @@ class TrelloReconciler:
                 if member is not None and len(card["members"]) == 0:
                     self.trello_addCardMembers(card["id"], member)
 
-                commit = next(filter(lambda c: jira["jira_key"] in c["commitMessage"], self.staging_commits), None)
-                if commit and commit is not None and self.jira_isStagingStory(jira["jira_key"], commit["commitMessage"]):
+                if self.jira_isStagingStory(jira["jira_key"]):
 
-                    jira["last_known_commit_date"] = commit["committerDate"]
-                    jira["git_commit_message"] = commit["commitMessage"]
-                    jira["in_staging"] = True
+                    # this feels redundant but no matter where I do it I am grabbing the commit object a second time
+                    commit = next(filter(lambda c: jira["jira_key"] in c["commitMessage"], self.staging_commits), None)
+
+                    jira["last_known_commit_date"]  = commit["committerDate"]
+                    jira["git_commit_message"]      = commit["commitMessage"]
+                    jira["in_staging"]              = True
 
             if self.trello_passedQA(card):
                 self.trello_copyCard(card, self.complete_listID)
@@ -389,15 +387,18 @@ class TrelloReconciler:
                 self.trello_addToList(story, self.todo_listID, top_of_list=True)
                 continue
 
-            commit = next(filter(lambda c: story["jira_key"] in c["commitMessage"], self.staging_commits), None)
-            if commit and commit is not None:
-                if self.jira_isStagingStory(story["jira_key"], commit["commitMessage"]):
-                    story["last_known_commit_date"] = commit["committerDate"]
-                    story["git_commit_message"] = commit["commitMessage"]
-                    story["in_staging"] = True
+            # if commit and commit is not None:
+            if self.jira_isStagingStory(story["jira_key"]):
 
-                    self.trello_addToList(story, self.todo_listID, commit_date=commit["committerDate"])
-                    continue
+                # I don't like grabbing this commit object twice
+                commit = next(filter(lambda c: story["jira_key"] in c["commitMessage"], self.staging_commits), None)
+
+                story["last_known_commit_date"]     = commit["committerDate"]
+                story["git_commit_message"]         = commit["commitMessage"]
+                story["in_staging"]                 = True
+
+                self.trello_addToList(story, self.todo_listID, commit_date=commit["committerDate"])
+                continue
 
             if self.jira_isOtherItem(story["jira_key"]):
                 self.trello_addToList(story, self.todo_listID)
@@ -452,31 +453,39 @@ class TrelloReconciler:
 
     def trello_addCardsToBoard(self):
         """Actually add cards from the new card list to the Trello board"""
+        stories         = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready))
         old_qa_ready    = [li["name"] for li in self.old_qa_ready_cards]
-        new_qa_ready    = [li["jira_key"] for li in self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready)) if not self.jira_isHotfix(li["jira_key"])]
+        new_qa_ready    = [s["jira_key"] for s in stories if not self.jira_isHotfix(s["jira_key"])]
 
         for card in self.new_cards:
             if card["jira_key"] not in self._old_card_names:
 
+                # figure out list positioning of new cards
                 current_index   = 0
                 prev_index      = None
 
                 if card["trello_listID"] == self.todo_listID:
-                    # Attempting incrementing current to account for the new pos it should be in
-                    current_index   = new_qa_ready.index(card["jira_key"]) + 1
-                    prev_index      = current_index - 1
+
+                    # is the list empty?
+                    if len(old_qa_ready) == 0:
+                        current_index   = 0
+                        prev_index      = -1
+
+                    else:
+                        current_index   = new_qa_ready.index(card["jira_key"]) + 1
+                        prev_index      = current_index - 1
 
                 if prev_index is None or prev_index < 0:
-                    card["pos"]    = "top"
+                    card["pos"] = "top"
 
                 if card["pos"] != "top" and 0 <= prev_index < (len(old_qa_ready) - 1):
-                    prev_t_pos  = self.old_qa_ready_cards[prev_index]["pos"]
-                    next_t_pos  = self.old_qa_ready_cards[prev_index + 1]["pos"]
+                    prev_t_pos = self.old_qa_ready_cards[prev_index]["pos"]
+                    next_t_pos = self.old_qa_ready_cards[prev_index + 1]["pos"]
                     pos_incr = (next_t_pos - prev_t_pos) / 2
 
                     self._last_card_pos = prev_t_pos + pos_incr
 
-                    card["pos"]    = self._last_card_pos
+                    card["pos"] = self._last_card_pos
 
                 desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                             card["jira_summary"],
@@ -594,18 +603,20 @@ class TrelloReconciler:
             raise ReconcileGitCommitException("Invalid commit message")
         return jira_key in [a.strip("[]") for a in re.findall(self.jira_key_pattern, commit_message)]
 
-    def jira_isStagingStory(self, jira_key, commit_message):
+    def jira_isStagingStory(self, jira_key):
         """Return True if Jira key is found in a commit message. This indicates that the branch we are watching (in this case staging, but that can be non-hardcoded) contains a commit with work pertaining to a given story.
 
         :param jira_key: jira_key of the story we want to check
-        :param commit_message: message attached to the commit we want to look at
         :return boolean:
         """
         if not jira_key or jira_key is None:
             raise ReconcileJiraStoryException("Invalid jira_key")
-        if not commit_message or commit_message is None:
-            raise ReconcileGitCommitException("Invalid commit message")
-        return self.jira_keyInCommitMesssage(jira_key, commit_message)
+
+        commit = next(filter(lambda c: jira_key in c["commitMessage"], self.staging_commits), None)
+        result = False
+        if commit is not None:
+            result = self.jira_keyInCommitMesssage(jira_key, commit["commitMessage"])
+        return result
 
     def jira_isInQaTesting(self, jira_key):
         """Return true if story has a Jira status of QA Testing.

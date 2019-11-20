@@ -21,9 +21,6 @@ class TestUtil(TestCase):
     positive tests for get_configs
     """
     def test_get_configs_name(self):
-        """Test.
-        
-        """
         configs     = "test.config.ini"
         fields      = ["name"]
         result      = get_configs(fields, configs)
