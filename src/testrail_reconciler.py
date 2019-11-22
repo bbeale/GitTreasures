@@ -178,7 +178,7 @@ class TestRailReconciler:
             raise ReconcileJiraStoryException("Invalid jira_key")
         if not project_id or project_id is None:
             raise ReconcileTestRailProjectException("Invalid project_id")
-        test_suite  = next(filter(lambda s: jira_key.lower() in s["name"].lower(), self.testrail.getTestSuites(project_id)), None)
+        test_suite  = next(filter(lambda s: jira_key.lower() in s["name"].lower(), self.testrail.get_test_suites(project_id)), None)
         return True if test_suite is not None else False
 
     def testrail_getProject(self, name):
@@ -189,7 +189,7 @@ class TestRailReconciler:
         """
         if not name or name is None:
             raise ReconcileTestRailProjectException("Invalid project name")
-        return next(filter(lambda p: p["name"] == name, self.testrail.getProjects()), None)
+        return next(filter(lambda p: p["name"] == name, self.testrail.get_projects()), None)
 
     def testrail_setProjectName(self, date):
         """Set the string representing the name of the TestRail project.
@@ -270,7 +270,7 @@ class TestRailReconciler:
             self.testrail_project_name = "{} Regression Tests".format(pname)
             self.testrail_project = self.testrail_getProject(self.testrail_project_name)
             if self.testrail_project is None:
-                self.testrail_project = self.testrail.addProject(self.testrail_project_name)
+                self.testrail_project = self.testrail.add_project(self.testrail_project_name)
 
             self.testrail_suites = self.testrail_populateSections(self.testrail_project["id"], self.done_this_release)
 
