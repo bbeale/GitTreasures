@@ -103,19 +103,31 @@ class TestRailException(Exception):
     pass
 
 
-class TestRailProjectException(TestRailException):
-    pass
-
-
 class TestRailUserException(TestRailException):
     pass
 
 
-class TestRailSuiteException(TestRailException):
+class TestRailProjectException(TestRailException):
     pass
 
 
 class TestRailSectionException(TestRailException):
+    pass
+
+
+class TestRailTestSuiteException(TestRailException):
+    pass
+
+
+class TestRailTestCaseException(TestRailException):
+    pass
+
+
+class TestRailTestRunException(TestRailException):
+    pass
+
+
+class TestRailTestPlanException(TestRailException):
     pass
 
 
