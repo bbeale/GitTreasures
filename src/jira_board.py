@@ -152,7 +152,7 @@ class JiraBoard:
                 print(httpe.response.status_code, "- Failed to get Jira sprints.")
         finally:
             # boards = None # test!!!
-            return next(filter(lambda story: story.state.lower() == "active" and "moodle" not in story.name.lower() and "release sprint" in story.name.lower(), sprints), None)
+            return next(filter(lambda story: story.state.lower() == "active" and "release sprint" in story.name.lower(), sprints), None)
 
     def get_jql_filter(self, filter_id):
         if not filter_id or filter_id is None:
