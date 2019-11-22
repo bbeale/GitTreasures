@@ -236,7 +236,7 @@ class TestRailReconciler:
         :return:
         """
         self.created_suites.append(
-            self.testrail.addTestSuite(
+            self.testrail.add_test_suite(
                 self.testrail_project["id"],
                 test_suite["name"],
                 test_suite["announcement"]

@@ -131,6 +131,10 @@ class TestRailTestPlanException(TestRailException):
     pass
 
 
+class TestRailTestException(TestRailException):
+    pass
+
+
 class TestRailNewEntityException(TestRailException):
     pass
 
