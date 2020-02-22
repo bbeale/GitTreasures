@@ -1,17 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from util import get_configs
 from src.exceptions import (
     JiraBoardIssueException,
     JiraBoardIssueFieldException,
     JiraBoardFilterException,
     JiraBoardProjectException
 )
-
-from util import get_configs
-
-from requests.exceptions import HTTPError
 from urllib.parse import urljoin
-from jira import JIRA
+from jira import JIRA, JIRAError
 import dateutil.parser
 import json
 import os
@@ -60,12 +57,12 @@ class JiraBoard:
         result = None
         try:
             result = self.jira.create_filter(filter_name, jql=new_query)
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira stories.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira stories.\nRetrying in a few seconds.")
             try:
                 result = self.jira.create_filter(filter_name, jql=new_query)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira stories.")
+            except JIRAError:
+                print("[!] Failed to get Jira stories.")
         finally:
             return result
 
@@ -84,12 +81,12 @@ class JiraBoard:
         result = None
         try:
             result = self.jira.update_filter(filter_id, jql=new_query)
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to update Jira filter.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to update Jira filter.\nRetrying in a few seconds.".format(str(JIRAError)))
             try:
                 result = self.jira.update_filter(filter_id, jql=new_query)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to update Jira filter.")
+            except JIRAError:
+                print("[!] Failed to update Jira filter.".format(str(JIRAError)))
         finally:
             return result
 
@@ -101,12 +98,12 @@ class JiraBoard:
         projects = None
         try:
             projects = self.jira.projects()
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira projects.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira projects.\nRetrying in a few seconds.".format(str(JIRAError)))
             try:
                 projects = self.jira.projects()
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira projects.")
+            except JIRAError:
+                print("[!] Failed to get Jira projects.".format(str(JIRAError)))
         finally:
             # projects = None # test!!!
             return next(filter(lambda proj: proj.key.upper() == self.project_key, projects), None)
@@ -123,12 +120,12 @@ class JiraBoard:
         boards = None
         try:
             boards = self.jira.boards(project_key)
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira projects.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira projects.\nRetrying in a few seconds.".format(str(JIRAError)))
             try:
                 boards = self.jira.boards(project_key)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira projects.")
+            except JIRAError:
+                print("[!] Failed to get Jira projects.".format(str(JIRAError)))
         finally:
             # boards = None # test!!!
             return next(filter(lambda board: board.name.lower() == "medhub development", boards), None)
@@ -144,12 +141,12 @@ class JiraBoard:
         sprints = None
         try:
             sprints = self.jira.sprints(board_id)
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira sprints.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira sprints.\nRetrying in a few seconds.".format(str(JIRAError)))
             try:
                 sprints = self.jira.sprints(board_id)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira sprints.")
+            except JIRAError:
+                print("[!] Failed to get Jira sprints.".format(str(JIRAError)))
         finally:
             # boards = None # test!!!
             return next(filter(lambda story: story.state.lower() == "active" and "release sprint" in story.name.lower(), sprints), None)
@@ -161,12 +158,12 @@ class JiraBoard:
         j_filter = None
         try:
             j_filter = self.jira.filter(filter_id)
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira filter.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira filter.\nRetrying in a few seconds.".format(str(JIRAError)))
             try:
                 j_filter = self.jira.filter(filter_id)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira filter.")
+            except JIRAError:
+                print("[!] Failed to get Jira filter.".format(str(JIRAError)))
         finally:
             return j_filter
 
@@ -183,12 +180,12 @@ class JiraBoard:
         issues = None
         try:
             issues = self.jira.search_issues(jql, maxResults=100)
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get issues from Jira filter.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get issues from Jira filter.\nRetrying in a few seconds.".format(str(JIRAError)))
             try:
                 issues = self.jira.search_issues(jql, maxResults=100)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get issues from Jira filter.")
+            except JIRAError:
+                print("[!] Failed to get issues from Jira filter.".format(str(JIRAError)))
         finally:
             return issues
 
@@ -208,13 +205,36 @@ class JiraBoard:
         else:
             try:
                 issues = self.get_issues_from_filter(filter_id)
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get issues from Jira filter.\nRetrying in a few seconds.")
+            except JIRAError:
+                print("[!] Failed to get issues from Jira filter.\nRetrying in a few seconds.".format(str(JIRAError)))
                 try:
                     issues = self.get_issues_from_filter(filter_id)
-                except HTTPError as httpe:
-                    print(httpe.response.status_code, "- Failed to get issues from Jira filter.")
+                except JIRAError:
+                    print("[!] Failed to get issues from Jira filter.".format(str(JIRAError)))
         return issues
+
+    def get_issue(self, issue_key):
+        """Get a Jira story given a key.
+
+        :param issue_key: a Jira story key
+        :return:
+        """
+        if not issue_key or issue_key is None:
+            raise JiraBoardIssueException("Invalid issue_key")
+
+        issue = None
+        try:
+            issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
+            try:
+                issue = self.jira.issue(issue_key, fields="status", expand="changelog")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
+        finally:
+            if issue is None:
+                raise JiraBoardIssueException("[!] Unable to retrieve issue {}".format(issue_key))
+            return issue
 
     def get_current_status(self, issue_key):
         """Get the current status for a given Jira story.
@@ -228,12 +248,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is not None:
                 return issue.fields.status.name
@@ -252,12 +272,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is not None:
                 return issue.fields.status.statusCategory.name
@@ -276,12 +296,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is not None:
                 return next(filter(lambda s: s["toString"], issue.fields.status.name), None)
@@ -300,12 +320,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is not None:
                 return next(filter(lambda l: l.lower() == "hotfix", issue.fields.labels), None) is not None
@@ -409,12 +429,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is None:
                 raise JiraBoardIssueException("NoneType issue is not valid.")
@@ -436,12 +456,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is None:
                 raise JiraBoardIssueException("NoneType issue is not valid.")
@@ -497,12 +517,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="status", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.")
         finally:
             if issue is None:
                 raise JiraBoardIssueException("NoneType issue is not valid.")
@@ -521,12 +541,12 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="attachment", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="attachment", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.".format(str(JIRAError)))
         finally:
             if issue is None:
                 raise JiraBoardIssueException("NoneType issue is not valid.")
@@ -545,22 +565,23 @@ class JiraBoard:
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
-        except HTTPError as httpe:
-            print(httpe.response.status_code, "- Failed to get Jira issue.\nRetrying in a few seconds.")
+        except JIRAError:
+            print("[!] Failed to get Jira issue.\nRetrying in a few seconds.")
             try:
                 issue = self.jira.issue(issue_key, fields="labels", expand="changelog")
-            except HTTPError as httpe:
-                print(httpe.response.status_code, "- Failed to get Jira issue.")
+            except JIRAError:
+                print("[!] Failed to get Jira issue.".format(str(JIRAError)))
         finally:
             if issue is None:
                 raise JiraBoardIssueException("NoneType issue is not valid.")
             else:
                 return [label.lower() for label in issue.fields.labels]
 
-    def get_parsed_stories(self, raw_issues):
+    def get_parsed_stories(self, raw_issues, testrail_mode=False):
         """Given a collection of raw Jira stories, parses them down to JSON objects containing needed fields only.
 
         :param raw_issues: JSON collection of stories returned from the Jira API
+        :param testrail_mode: Should QA dates be ignored? If they're in the release but haven't been QAed yet... yes.
         :return parsed_stories: a list of parsed stories ready for one of the reconcile methods
         """
         if raw_issues is None:
@@ -585,7 +606,7 @@ class JiraBoard:
             _summary            = "".join(re.findall(r'[^*`#\t\'"]', _story.fields.summary))
             _desc               = "".join(re.findall(r'[^*`#\t\'"]', _story.fields.description))
 
-            if "testrail" in self.caller.lower():
+            if testrail_mode:
                 record = dict(
                     jira_key                = _story.key,
                     jira_url                = _url,
@@ -608,7 +629,7 @@ class JiraBoard:
                 ), None)
 
                 if _qaDateStatus is None:
-                    raise Exception("No QA date found")
+                    raise JiraBoardFilterException("[!] No QA date found")
 
                 _movedToQaDate  = dateutil.parser.parse(_qaDateStatus["created"])
 
@@ -636,7 +657,7 @@ class JiraBoard:
                 if _movedToQaDate is not None:
                     _qaDate     = _movedToQaDate.strftime("%Y-%m-%d %H:%M:%S%z")
                 else:
-                    raise Exception("No QA date status found")
+                    raise JiraBoardFilterException("[!] No QA date status found")
 
                 _api_url        = urljoin(self.host, "rest/api/2/issue/{}".format(_story.key))
                 _hotfix         = self.is_hotfix(_story.key)
@@ -667,4 +688,9 @@ class JiraBoard:
                 )
 
             parsed_stories.append(record)
-        return sorted(parsed_stories, key=lambda story: story["jira_qa_date"])
+
+        if testrail_mode:
+            result = sorted(parsed_stories, key=lambda story: story["jira_updated"])
+        else:
+            result = sorted(parsed_stories, key=lambda story: story["jira_qa_date"])
+        return result

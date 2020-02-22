@@ -4,6 +4,8 @@ from src.exceptions import (
     ListIdException,
     CardException,
     CardNameException,
+    JiraBoardIssueException,
+    JiraBoardFilterException,
     ReconcileJiraBoardException,
     ReconcileJiraStoryException,
     ReconcileGitLogException,
@@ -51,8 +53,6 @@ class TrelloReconciler:
         self.jira_key_pattern       = config["jira_pattern"]
         self.filter_qa_status       = config["filter_qa_status"]
         self.filter_qa_ready        = config["filter_qa_ready"]
-        self.jira_qa_statuses       = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_status))
-        self.jira_qa_ready          = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready))
         self.staging_commits        = self.git.commits
         self.trello_labels          = self.trello.labels
         self.failed_listID          = self.trello.failedListId
@@ -60,11 +60,26 @@ class TrelloReconciler:
         self.todo_listID            = self.trello.todoListId
         self.testing_listID         = self.trello.testingListId
         self.complete_listID        = self.trello.completeListId
+        self.jira_qa_statuses       = None
+        self.jira_qa_ready          = None
+        self._last_card_pos         = None
         self._old_card_names        = []
         self.old_qa_ready_cards     = []
         self.new_cards              = []
         self._changed               = []
-        self._last_card_pos         = None
+
+        # 2 stage initialization, ready go!
+        self.populate()
+
+    def populate(self):
+        """Seocnd stage of reconciler initialization."""
+        try:
+            self.jira_qa_statuses = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_status))
+            self.jira_qa_ready = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready))
+        except JiraBoardIssueException:
+            raise JiraBoardIssueException("[!] Issues initialization problem.")
+        except JiraBoardFilterException:
+            raise JiraBoardFilterException("[!] Filter initialization problem.")
 
     # Trello methods
     def trello_getOldFailed(self):
@@ -455,37 +470,42 @@ class TrelloReconciler:
         """Actually add cards from the new card list to the Trello board"""
         stories         = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready))
         old_qa_ready    = [li["name"] for li in self.old_qa_ready_cards]
-        new_qa_ready    = [s["jira_key"] for s in stories if not self.jira_isHotfix(s["jira_key"])]
+        new_qa_ready    = [s["jira_key"] for s in stories]
 
         for card in self.new_cards:
             if card["jira_key"] not in self._old_card_names:
 
                 # figure out list positioning of new cards
-                current_index   = 0
-                prev_index      = None
+                current_index = 0
+                prev_index = None
 
-                if card["trello_listID"] == self.todo_listID:
-
-                    # is the list empty?
-                    if len(old_qa_ready) == 0:
-                        current_index   = 0
-                        prev_index      = -1
-
-                    else:
-                        current_index   = new_qa_ready.index(card["jira_key"]) + 1
-                        prev_index      = current_index - 1
-
-                if prev_index is None or prev_index < 0:
+                # add to the top of the list right away if stale QA
+                if self.jira_isStaleQAReady(card["jira_key"]):
                     card["pos"] = "top"
+                else:
 
-                if card["pos"] != "top" and 0 <= prev_index < (len(old_qa_ready) - 1):
-                    prev_t_pos = self.old_qa_ready_cards[prev_index]["pos"]
-                    next_t_pos = self.old_qa_ready_cards[prev_index + 1]["pos"]
-                    pos_incr = (next_t_pos - prev_t_pos) / 2
+                    if card["trello_listID"] == self.todo_listID:
 
-                    self._last_card_pos = prev_t_pos + pos_incr
+                        # is the list empty?
+                        if len(old_qa_ready) < 1:       # == 0:
+                            current_index   = 0
+                            prev_index      = -1
 
-                    card["pos"] = self._last_card_pos
+                        else:
+                            current_index   = new_qa_ready.index(card["jira_key"]) + 1
+                            prev_index      = current_index - 1
+
+                    if prev_index is None or prev_index < 0:
+                        card["pos"] = "top"
+
+                    if card["pos"] != "top" and 0 <= prev_index < (len(old_qa_ready) - 1):
+                        prev_t_pos = self.old_qa_ready_cards[prev_index]["pos"]
+                        next_t_pos = self.old_qa_ready_cards[prev_index + 1]["pos"]
+                        pos_incr = (next_t_pos - prev_t_pos) / 2
+
+                        self._last_card_pos = prev_t_pos + pos_incr
+
+                        card["pos"] = self._last_card_pos
 
                 desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                             card["jira_summary"],

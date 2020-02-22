@@ -1,18 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from src.exceptions import (
-    ReconcileJiraBoardException,
-    ReconcileJiraStoryException,
-    ReconcileTrelloBoardException,
-    ReconcileTrelloCardException,
-    ReconcileTestRailException,
-    ReconcileTestRailProjectException
-)
-
 from util import get_configs
-
-import datetime
-import sys
 import os
 
 
@@ -26,38 +14,37 @@ class TestRailReconciler:
         :param trello: instance of TrelloBoard
         """
         if not jira or jira is None:
-            raise ReconcileJiraBoardException("Initialization fail - missing JiraBoard instance")
+            raise TRReconcilerException("[!] Initialization fail - missing JiraBoard instance")
         if not trello or trello is None:
-            raise ReconcileTrelloBoardException("Initialization fail - missing TrelloBoard instance")
+            raise TRReconcilerException("[!] Initialization fail - missing TrelloBoard instance")
 
         upath = (os.path.relpath(os.path.join("src", "users.ini")))
         self.testers = [t for t in get_configs(["jira_displayname", "trello_id"], upath).values()]
 
-        print("Grabbing stories from Jira that need regression tests...")
+        print("[+] Grabbing stories from Jira that need regression tests...")
 
         self.testrail           = testrail
         self.jira               = jira
         self.trello             = trello
 
-        self.jira_project       = self.jira_getProject()
-        self.jira_board         = self.jira_getBoard()
-        self.current_release    = self.jira_getCurrentSprint(self.jira_board.id)
-        self.last_week          = self.jira_getStories(config["filter_last_week"])
-        self.done_this_release  = self.jira_getStories(config["filter_this_release"])
-
         self.created_suites     = []
 
-    def trello_labelRegressionTests(self, card):
-        """Add a label to regression test card on Trello board.
+        self.jira_project       = self.get_jira_project()
+        self.jira_board         = self.get_jira_board()
+        self.current_jira_sprint = self.get_current_jira_sprint(self.jira_board.id)
+        self.last_week          = self.get_jira_stories(config["filter_last_week"])
+        self.done_this_release  = self.get_jira_stories(config["filter_this_release"])
 
-        :param card: Trello card to label
-        """
-        if not card or card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
-        if card["name"] in self.trello.cards:
-            self.trello.add_new_label(card["id"], "regressiontests", color="purple")
+        try:
+            pname = self.current_jira_sprint.name.split("Sprint")[0].strip()
+        except TRReconcilerException("[!] current_jira_sprint undefined. Unable to determine project name from TestRail.") as error:
+            raise error
 
-    def trello_addCard(self, card_name, list_id, desc, pos):
+        else:
+            self.testrail_project_name = "{} Regression Tests".format(pname)
+            self.testrail_project = self.get_testrail_project(self.testrail_project_name)
+
+    def add_trello_card(self, card_name, list_id, desc, pos):
         """Add a card to the Trello board.
 
         :param card_name:
@@ -68,49 +55,14 @@ class TestRailReconciler:
         """
         return self.trello.add_new_card(card_name, list_id, desc, pos)
 
-    def trello_populate(self):
-
-        self.trello_checkitems = self.testrail_populateSections(self.testrail_project["id"], self.last_week)
-        cardName = "{} {}".format(self.testrail_project_name, datetime.date.today().strftime("%Y-%m-%d"))
-        card = next(filter(lambda c: c["name"] == cardName, [card for card in self.trello.cards]), None)
-
-        if card is None:
-            # Add the new card
-            cardtext = "Weekly Regression testing for stories that have passed QA over the period of the last 7 days."
-            newCard = self.trello_addCard(cardName, self.trello.otherListId, "top", cardtext)
-
-            # Add labels to the new card
-            self.trello.add_new_label(newCard["id"], "regressiontests", color="purple")
-
-            # Add all QA testers to the new card
-            for trello_testerID in [t["trello_id"] for t in self.testers if "trello_id" in t.keys()]:
-                self.trello.add_new_member(newCard["id"], trello_testerID)
-
-            # Add checklist of stories to the card
-            checklist = self.trello.add_new_checklist(newCard["id"])
-            for ts in self.trello_checkitems:
-                self.trello.add_new_checklist_item(newCard["id"], checklist["id"], ts["name"])
-
-        else:
-            # Check for a checklist on the existing card. If it doesn't exist, add it
-            checklist = self.trello.get_checklist(card["id"])
-            if checklist is None or len(checklist) is 0:
-                checklist = self.trello.add_new_checklist(card["id"])
-
-            # Add stories to the checklist if they aren't already there
-            for ts in self.trello_checkitems:
-                if ts["name"] not in self.trello.get_checklist_items(checklist["id"]):
-                    self.trello.add_new_checklist_item(card["id"], checklist["id"], ts["name"])
-
-    # Jira methods
-    def jira_getProject(self):
+    def get_jira_project(self):
         """Get the current project from JiraBoard instance.
 
         :return: the current project if it exists, None if not
         """
         return self.jira.get_project()
 
-    def jira_getBoard(self, key=None):
+    def get_jira_board(self, key=None):
         """Get the current board from the current project on the instance.
 
         :param key:
@@ -120,27 +72,27 @@ class TestRailReconciler:
             key = self.jira.get_project()
         return self.jira.get_board(key)
 
-    def jira_getCurrentSprint(self, board_id):
+    def get_current_jira_sprint(self, board_id):
         """Get the current sprint (and probably some Moodle bullshit becasue they are too incompetent to make their own Jira project...).
 
         :param board_id: board ID of the Jira board
         :return: the current sprint if one exists that matches criteria
         """
         if not board_id or board_id is None:
-            raise ReconcileJiraBoardException("Invalid board ID")
+            raise TRReconcilerException("[!] Invalid board ID")
         return self.jira.get_current_sprint(board_id)
 
-    def jira_getStories(self, filter_id):
+    def get_jira_stories(self, filter_id):
         """Get a list of Jira stories given the ID of a JQL filter.
 
         :param filter_id: filter ID of the JQL filter (defined in Jira)
         :return: list of stories returned by the filter
         """
         if not filter_id or filter_id is None:
-            raise ReconcileJiraBoardException("Invalid filter ID")
-        return self.jira.get_parsed_stories(self.jira.get_issues(filter_id))
+            raise TRReconcilerException("[!] Invalid filter ID")
+        return self.jira.get_parsed_stories(self.jira.get_issues(filter_id), testrail_mode=True)
 
-    def jira_updateFilter(self, filter_id, query):
+    def update_jira_filter(self, filter_id, query):
         """Update the query used by a JQL filter.
 
         :param filter_id: filter ID of the JQL filter (defined in Jira)
@@ -148,12 +100,12 @@ class TestRailReconciler:
         :return: JSON representation of the filter
         """
         if not filter_id or filter_id is None:
-            raise ReconcileJiraBoardException("Invalid filter ID")
+            raise TRReconcilerException("[!] Invalid filter ID")
         if not query or query is None:
-            raise ReconcileJiraBoardException("Invalid query")
+            raise TRReconcilerException("[!] Invalid query")
         return self.jira.update_filter(filter_id, query)
 
-    def jira_newFilter(self, name, query):
+    def new_jira_filter(self, name, query):
         """Create a new JQL filter.
 
         :param name: name of the new JQL filter
@@ -161,13 +113,40 @@ class TestRailReconciler:
         :return: JSON representation of the filter
         """
         if not name or name is None:
-            raise ReconcileJiraBoardException("Invalid name")
+            raise TRReconcilerException("[!] Invalid name")
         if not query or query is None:
-            raise ReconcileJiraBoardException("Invalid query")
+            raise TRReconcilerException("[!] Invalid query")
         return self.jira.add_new_filter(name, query)
 
     # TestRail methods
-    def testrail_suiteExists(self, jira_key, project_id):
+    def get_testrail_project(self, name):
+        """Get a project from TestRail by name.
+
+        :param name:
+        :return: the "name" field of a TestRail project if it exists, otherwise None
+        """
+        if not name or name is None:
+            raise TRReconcilerException("[!] Invalid project name")
+        return next(filter(lambda p: p["name"] == name, self.testrail.get_projects()), None)
+
+    def get_testrail_sections(self, project_id):
+        """
+
+        :param project_id:
+        :return:
+        """
+        if not project_id or project_id is None:
+            raise TRReconcilerException("[!] Invalid project_id")
+
+        if type(project_id) not in [int, float]:
+            raise TRReconcilerException("[!] project_id must be an int or float")
+
+        if project_id <= 0:
+            raise TRReconcilerException("[!] project_id must be > 0")
+
+        return self.testrail.get_sections(project_id)
+
+    def _testrail_suite_exists(self, jira_key, project_id):
         """Check the existence of a test suite in TestRail (before adding a new one).
 
         :param jira_key:
@@ -175,33 +154,25 @@ class TestRailReconciler:
         :return boolean: True if the test suite exists, False if not
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TRReconcilerException("[!] Invalid jira_key")
         if not project_id or project_id is None:
-            raise ReconcileTestRailProjectException("Invalid project_id")
-        test_suite  = next(filter(lambda s: jira_key.lower() in s["name"].lower(), self.testrail.get_test_suites(project_id)), None)
+            raise TRReconcilerException("[!] Invalid project_id")
+
+        test_suites = self.testrail.get_test_suites(project_id)
+        test_suite  = next(filter(lambda s: jira_key.lower() in s["name"].lower(), test_suites), None)
         return True if test_suite is not None else False
 
-    def testrail_getProject(self, name):
-        """Get a project from TestRail by name.
-
-        :param name:
-        :return: the "name" field of a TestRail project if it exists, otherwise None
-        """
-        if not name or name is None:
-            raise ReconcileTestRailProjectException("Invalid project name")
-        return next(filter(lambda p: p["name"] == name, self.testrail.get_projects()), None)
-
-    def testrail_setProjectName(self, date):
+    def _testrail_project_name(self, date):
         """Set the string representing the name of the TestRail project.
 
         :param date: date to use for setting a unique project name
         :return string: the project name (a formatted string)
         """
         if not date or date is None:
-            raise ReconcileTestRailProjectException("Invalid date")
+            raise TRReconcilerException("[!] Invalid date")
         return "Weekly Regression Tests {}".format(date)
 
-    def testrail_populateSections(self, project_id, jira_stories):
+    def populate_testrail_sections(self, project_id, jira_stories):
         """Populate test case "sections" (or suites?) from each Jira item
 
         :param project_id: TestRail project_id
@@ -209,74 +180,172 @@ class TestRailReconciler:
         :return list: list of items to add to TestRail
         """
         if not project_id or project_id is None:
-            raise ReconcileTestRailProjectException("Invalid project_id")
-        toTestRail = []
-        testers = [t["jira_displayname"] for t in self.testers]
-        for untested in list(filter(lambda s: s["tested_by"] in testers, jira_stories)):
-
+            raise TRReconcilerException("[!] Invalid project_id")
+        sections = []
+        for js in jira_stories:
             data = dict(
                 project_id      = project_id,
-                jira_key        = untested["jira_key"],
-                name            = "{} - {}".format(untested["jira_key"], untested["jira_summary"]),
-                announcement    = "{}\n\nURL:\n{}\n\nUpdated on:\n{}".format(untested["jira_desc"], untested["jira_url"], untested["jira_updated"])
+                jira_key        = js["jira_key"],
+                name            = "{} - {}".format(js["jira_key"], js["jira_summary"]),
+                announcement    = "{}\n\nURL:\n{}\n\nUpdated on:\n{}".format(js["jira_desc"], js["jira_url"], js["jira_updated"])
             )
-            toTestRail.append(data)
-        return toTestRail
+            sections.append(data)
+        return sections
 
-    def testrail_addTestPlan(self, projectID, plan_name, ):
-        raise NotImplementedError
+    def add_testrail_sprint(self, project_id, name):
+        """Add a TestRail section representing a 2 week sprint within a release.
 
-    def testrail_addToTestPlan(self, planID, item, ):
-        raise NotImplementedError
-
-    def testrail_addTestSuite(self, test_suite):
-        """Add a test suite to the current project.
-
-        :param test_suite:
+        :param project_id:
+        :param name:
         :return:
         """
-        self.created_suites.append(
-            self.testrail.add_test_suite(
-                self.testrail_project["id"],
-                test_suite["name"],
-                test_suite["announcement"]
-            ))
+        if not project_id or project_id is None:
+            raise TRReconcilerException("[!] Invalid project_id")
 
-    def testrail_populateTestSuites(self, test_suites):
-        """Add a list of test suites to the current project using self.testrail_addTestSuite
+        if type(project_id) not in [int, float]:
+            raise TRReconcilerException("[!] project_id must be an int or float")
 
-        :param test_suites:
+        if project_id <= 0:
+            raise TRReconcilerException("[!] project_id must be > 0")
+
+        if not name or name is None:
+            raise TRReconcilerException("[!] name is required.")
+
+        return self.testrail.add_sprint_section(project_id, name)
+
+    def add_testrail_story(self, project_id, name, parent_id, description):
+        """Same as add_testrail_sprint but adds a sprint section with a sprint section id as its parent_id.
+
+        :param project_id:
+        :param parent_id:
+        :param name:
+        :param description:
         :return:
         """
-        for suite in test_suites:
-            if not self.testrail_suiteExists(suite["jira_key"], self.testrail_project["id"]):
-                self.testrail_addTestSuite(suite)
+        if not project_id or project_id is None:
+            raise TRReconcilerException("[!] Invalid project_id")
 
-    def testrail_populate(self):
-        """Populate TestRail project and test suites.
-        Steps:
-            1) try to get the project name from the current Jira sprint
-            2) if a project doesnt't exist by our name, create it
-            3) add test sections to TestRail project
-            4) add test suites to TestRail
+        if type(project_id) not in [int, float]:
+            raise TRReconcilerException("[!] project_id must be an int or float")
+
+        if project_id <= 0:
+            raise TRReconcilerException("[!] project_id must be > 0")
+
+        if not name or name is None:
+            raise TRReconcilerException("[!] name is required.")
+
+        if not description or description is None:
+            raise TRReconcilerException("[!] description is required.")
+
+        if not parent_id or parent_id is None:
+            raise TRReconcilerException("[!] Invalid parent_id")
+
+        if type(parent_id) not in [int, float]:
+            raise TRReconcilerException("[!] parent_id must be an int or float")
+
+        if parent_id <= 0:
+            raise TRReconcilerException("[!] parent_id must be > 0")
+
+        return self.testrail.add_story_section(project_id, name, parent_id, description)
+
+    def add_testrail_testcase(self, story_section_id, title, type_id=9, template_id=None, priority_id=None, estimate=None, milestone_id=None, refs=None):
+        """Add a test case to the project.
+
+        :param story_section_id:
+        :param title:
+        :param type_id:
+        :param template_id:
+        :param priority_id:
+        :param estimate:
+        :param milestone_id:
+        :param refs:
+        :return:
         """
-        try:
-            pname = self.current_release.name.split("Sprint")[0].strip()
-        except ReconcileTestRailException:
-            print("current_release undefined. Unable to determine project name from TestRail.")
-            sys.exit(-1)
+        if not story_section_id or story_section_id is None:
+            raise TRReconcilerException("[!] Need a section_id for a story to add a test case.")
 
-        else:
-            self.testrail_project_name = "{} Regression Tests".format(pname)
-            self.testrail_project = self.testrail_getProject(self.testrail_project_name)
-            if self.testrail_project is None:
-                self.testrail_project = self.testrail.add_project(self.testrail_project_name)
+        if type(story_section_id) not in [int, float]:
+            raise TRReconcilerException("[!] story_section_id must be an int or float")
 
-            self.testrail_suites = self.testrail_populateSections(self.testrail_project["id"], self.done_this_release)
+        if story_section_id <= 0:
+            raise TRReconcilerException("[!] story_section_id must be > 0")
 
-            self.testrail_populateTestSuites(self.testrail_suites)
+        if not title or title is None:
+            raise TRReconcilerException("[!] A valid title is required.")
 
-    def reconcile(self):
-        """Add Jira stories in need of regression tests to TestRail, and make a card with them to add to Trello."""
-        self.testrail_populate()
-        self.trello_populate()
+        if type_id is None or type(type_id) != int:
+            raise TRReconcilerException("[!] Invalid type_id.")
+
+        data = dict()
+
+        if template_id is not None and type(template_id) == int and template_id > 0:
+            data["template_id"] = template_id
+
+        if priority_id is not None and type(priority_id) == int and priority_id > 0:
+            data["priority_id"] = priority_id
+
+        if estimate is not None and type(estimate) == str and estimate != "":
+            data["estimate"] = estimate
+
+        if milestone_id is not None and type(milestone_id) == int and milestone_id > 0:
+            data["milestone_id"] = milestone_id
+
+        if refs is not None and type(refs) == str and refs != "":
+            data["refs"] = refs
+
+        return self.testrail.add_test_case(story_section_id, title, **data)
+
+    def add_testrail_test_plan(self, projectID, plan_name, ):
+        raise NotImplementedError
+
+    def add_testrail_test_to_test_plan(self, planID, item, ):
+        raise NotImplementedError
+
+    def populate_release(self):
+        """Populate TestRail project and test suites."""
+        # every section in the project -- sprints and stories alike
+        all_sections = self.get_testrail_sections(self.testrail_project["id"])
+
+        # get the sprint sections from the list of sections
+        sprint_sections = list(filter(lambda s: s["parent_id"] is None, all_sections))
+
+        # get the current sprint from Jira based on our project name
+        current_sprint = next(filter(lambda s: s["name"] == self.current_jira_sprint.name, sprint_sections), None)
+
+        if current_sprint is None:
+            current_sprint = self.add_testrail_sprint(self.testrail_project["id"], self.current_jira_sprint.name)
+
+        # get all STORIES, which should always have a parent ID
+        story_sections = list(filter(lambda s: s["parent_id"] is not None, all_sections))
+        current_sprint_stories = list(filter(lambda s: s["parent_id"] == current_sprint["id"], story_sections))
+
+        # add a new TestRail project for the current release if none is found
+        if self.testrail_project is None:
+            self.testrail_project = self.testrail.add_project(self.testrail_project_name)
+
+        # create new TestRail story sections from Jira stories
+        new_story_sections = self.populate_testrail_sections(self.testrail_project["id"], self.done_this_release)
+
+        release_story_names = [s["name"] for s in story_sections]
+        sprint_story_names = [s["name"] for s in current_sprint_stories]
+
+        for story in new_story_sections:
+            in_release = True if next(filter(lambda r: story["jira_key"] in r, release_story_names), None) is not None else False
+            in_sprint = True if next(filter(lambda s: story["jira_key"] in s, sprint_story_names), None) is not None else False
+
+            if not in_release and not in_sprint:
+
+                # print(story["name"])
+                # print("Not in release", story["name"] not in release_story_names)
+                # print("Not in sprint", story["name"] not in sprint_story_names)
+
+                new_story_section = self.add_testrail_story(self.testrail_project["id"], name=story["name"], parent_id=current_sprint["id"], description=story["announcement"])
+
+                new_testcase = self.add_testrail_testcase(new_story_section["id"], title="Placeholder (change my title when you are ready to write me)", refs=story["jira_key"])
+                print("[+] Added {}".format(new_testcase))
+            else:
+                print("[!] Already there: ", story["jira_key"])
+
+
+class TRReconcilerException(Exception):
+    pass

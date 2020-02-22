@@ -6,10 +6,8 @@ from src.trello_board import TrelloBoard
 from src.testrail import TestRail
 from src.jira_board import JiraBoard
 from src.gitlab_log import GitLabLog
-from src.git_log import GitLog
 from util import is_db_init
-
-from argparse import ArgumentParser, ArgumentError
+from argparse import ArgumentParser
 import configparser
 import inspect
 import time
@@ -19,16 +17,6 @@ import os
 usage = """Use this tool to update a Trello board with QA order/priorities based on data retrieved from Jira and git.
     python git_treasures.py --url <repository url> | --path <repository path>
 """
-
-parser = ArgumentParser()
-
-# use a different entrypoint based on CLI args
-parser.add_argument("--dev", help="Run the development version of the script")
-parser.add_argument("--testrail", help="Run the TestRail integration")
-parser.add_argument("--testrail-dev", help="Run the dev version of the TestRail integration")
-parser.add_argument("--gitlab", help="Run the GitLab version of the script")
-parser.add_argument("--gitlab-dev", help="Run the GitLab development version of the script")
-parser.add_argument("--github", help="Run the GitHub version of the script")
 
 # database path shouldn't change
 db_path = os.path.join(
@@ -110,13 +98,21 @@ try:
         filter_this_release = config["jira"]["filter_this_release"],
     )
 
-except KeyError as KE:
-    print(KE, "Key does not exist")
-    sys.exit(-1)
+except (configparser.Error, KeyError) as error:
+    raise error("[!] Failed to set config values from config file.")
 
-except configparser.Error as E:
-    print(E, "Failed to get settings from config file")
-    sys.exit(-1)
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument(
+        "-d", "--dev",
+        required=False,
+        help="Run the development version of the script")
+    parser.add_argument(
+        "-tr", "--testrail",
+        required=False,
+        help="If true, will reconcile TestRail after Trello is complete.")
+    return parser.parse_args()
 
 
 def main():
@@ -127,159 +123,36 @@ def main():
     Other "versions" that were previously separate files can be called by specifying the command line argument for the thing that the old file used to do
     """
     print("Starting GitTreasures")
+    args = parse_args()
 
-    start               = time.time()
+    start = time.time()
 
-    # initialize interfaces with Trello, Jira and Git
-    trello              = TrelloBoard(trello_config)
-    trello.populate()
-
-    jira                = JiraBoard(jira_config)
-    git                 = GitLog(git_config)
-
-    # populate the GitLog object with relevant commits
-    git.populate()
-
-    TrelloReconciler(jira, git, trello, tr_config).reconcile()
-
-    end                 = time.time()
-    duration            = int(end) - int(start)
-
-    print("duration: {}s".format(str(duration)))
-
-
-def dev():
-    """The development/test entry point."""
-    print("Starting GitTreasures in TEST MODE")
-
-    start               = time.time()
-
-    # initialize interfaces with Trello, Jira and Git
-    trello              = TrelloBoard(trello_config, testMode=True)
-    trello.populate()
-
-    jira                = JiraBoard(jira_config)
-    git                 = GitLog(git_config)
-
-    # populate the GitLog object with relevant commits
-    git.populate()
-
-    TrelloReconciler(jira, git, trello, tr_config).reconcile()
-
-    end                 = time.time()
-    duration            = int(end) - int(start)
-
-    print("duration: {}s".format(str(duration)))
-
-
-def testrail_main():
-    """Main TestRail entry point."""
-    print("Starting TestRail sync")
-
-    start                   = time.time()
-    testrail                = TestRail(testrail_config)
-    jira                    = JiraBoard(jira_config)
-    trello                  = TrelloBoard(trello_config)
-    trello.populate()
-
-    TestRailReconciler(testrail, jira, trello, trr_config).reconcile()
-
-    end                     = time.time()
-    duration                = int(end) - int(start)
-
-    print("duration: {}s".format(str(duration)))
-
-
-def testrail_dev():
-    """TestRail development/test entry point."""
-    print("Starting TestRail sync in TEST MODE")
-
-    start                   = time.time()
-    testrail                = TestRail(testrail_config)
-    jira                    = JiraBoard(jira_config)
-    trello                  = TrelloBoard(trello_config, testMode=True)
-    trello.populate()
-
-    TestRailReconciler(testrail, jira, trello, trr_config).reconcile()
-
-    end                     = time.time()
-    duration                = int(end) - int(start)
-
-    print('duration: {}s'.format(str(duration)))
-
-
-def gitlab_main():
-    """The development version of the GitLab entry point.
-    This will replace the main version after the migration to GitLab.
-
-    """
-    print('Starting GitTreasures with GitLab')
-
-    start               = time.time()
-
-    # initialize interfaces with Trello, Jira and GitLab
-    trello              = TrelloBoard(trello_config)
-    jira                = JiraBoard(jira_config)
-    git                 = GitLabLog(gitlab_config)
-
-    # populate the GitLabLog object with relevant commits
-    git.populate()
-
-    TrelloReconciler(jira, git, trello, tr_config).reconcile()
-
-    end                 = time.time()
-    duration            = int(end) - int(start)
-
-    print('duration: {}s'.format(str(duration)))
-
-
-def gitlab_dev():
-    """The development version of the GitLab entry point.
-    This will replace the main version after the migration to GitLab.
-
-    """
-    print('Starting GitTreasures with GitLab in TEST MODE')
-
-    start               = time.time()
-
-    # initialize interfaces with Trello, Jira and GitLab
-    trello              = TrelloBoard(trello_config, testMode=True)
-    jira                = JiraBoard(jira_config)
-    git                 = GitLabLog(gitlab_config)
-
-    # populate the GitLabLog object with relevant commits
-    git.populate()
-
-    TrelloReconciler(jira, git, trello, tr_config).reconcile()
-
-    end                 = time.time()
-    duration            = int(end) - int(start)
-
-    print('duration: {}s'.format(str(duration)))
-
-
-if __name__ == '__main__':
-
-    if len(sys.argv[1:]) == 0:
-        main()
-
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--dev":
-        dev()
-
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--testrail":
-        testrail_main()
-
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--testrail-dev":
-        testrail_dev()
-
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--gitlab":
-        gitlab_main()
-
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--gitlab-dev":
-        gitlab_dev()
-
-    elif len(sys.argv[1:]) == 1 and sys.argv[1] == "--github":
-        raise NotImplementedError       # TODO
-
+    # initialize all my non-reconciler classes
+    if args.dev:
+        trello = TrelloBoard(trello_config, testMode=True)
     else:
-        raise ArgumentError("Not a valid argument")
+        trello = TrelloBoard(trello_config)
+
+    jira = JiraBoard(jira_config)
+    git = GitLabLog(gitlab_config)
+    testrail = TestRail(testrail_config)
+
+    # stage 2 init process (really big fan of these it seems)
+    trello.populate()
+    git.populate()
+
+    # initialize the reconcolers
+    trello_reconciler = TrelloReconciler(jira, git, trello, tr_config)
+    trello_reconciler.reconcile()
+    testrail_reconciler = TestRailReconciler(testrail, jira, trello, trr_config)
+
+    if args.testrail:
+        testrail_reconciler.populate_release()
+
+    end = time.time()
+    duration = int(end) - int(start)
+    print("[+] duration: {}s".format(str(duration)))
+
+
+if __name__ == "__main__":
+    main()
