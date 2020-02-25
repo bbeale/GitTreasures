@@ -15,12 +15,6 @@ class TestRail:
         self.yak = TestRailYak(config["url"], config["user"], config["password"])
         self.users = self.get_users()
 
-    """
-        Getters
-
-        These methods grab entitles from the TestRail REST API. 
-    """
-
     def get_users(self):
         """Get a list of TestRail users.
 
@@ -74,6 +68,31 @@ class TestRail:
 
         try:
             result = self.yak.project.get_project(project_id)
+        except NewTestRailException as error:
+            raise error
+        else:
+            return result
+
+    def add_project(self, name, announcement=None, show_announcement=True, suite_mode=1):
+        """Add a new project to TestRail.
+
+        :param name: name of the new TestRail project
+        :param announcement: brief description of the TestRail project
+        :param show_announcement: a truthy value or True show the announcement, a falsey value or False hides it
+        :param suite_mode: suite mode of the project (1 for single suite mode, 2 for single suite + baselines, 3 for multiple suites)
+        :return: response from TestRail API containing the newly created project
+        """
+        if not name or name is None:
+            raise TestRailValidationException("[!] Invalid project name. Unable to create new project.")
+
+        data = dict(
+            announcement        = announcement,
+            show_announcement   = show_announcement,
+            suite_mode          = suite_mode
+        )
+
+        try:
+            result = self.yak.project.add_project(name, data)
         except NewTestRailException as error:
             raise error
         else:
@@ -140,6 +159,73 @@ class TestRail:
         else:
             return result
 
+    def add_sprint_section(self, project_id, name):
+        """Add a new section representing a "sprint" to a TestRail project.
+
+        For readability, this separate method is just for adding parent sections (Jira sprints) vs child sections (Jira stories).
+
+        To populate a new child section with a Jira story, use add_story_section() and give it the id value returned here.
+
+        :param project_id: project ID of the TestRail project
+        :param name: name of the new TestRail test section
+        :return: response from TestRail API containing the newly created test section
+        """
+        if not project_id or project_id is None:
+            raise TestRailValidationException("[!] Invalid project_id")
+
+        if type(project_id) not in [int, float]:
+            raise TestRailValidationException("[!] project_id must be an int or float")
+
+        if project_id <= 0:
+            raise TestRailValidationException("[!] project_id must be > 0")
+
+        if not name or name is None:
+            raise TestRailValidationException("[!] Name field is required")
+
+        try:
+            result = self.yak.section.add_sprint_section(project_id, dict(name=name))
+        except NewTestRailException as error:
+            raise error
+        else:
+            return result
+
+    def add_story_section(self, project_id, name, parent_id, description):
+        """Add a new section representing a "story" to a TestRail project.
+
+        This section will be assigned to a parent/child relationship with a parent section, thus parent_id is required.
+
+        Use the id value returned by add_sprint_section as the parent_id.
+
+        Because of this parent id requirement, no suite_id will be needed. If it is ever used in the future, add_sprint_section is the more appropriate place for it.
+
+        :param project_id: project ID of the TestRail project
+        :param name: name of the new TestRail test section
+        :param description: description of the test section
+        :param parent_id: section ID of the parent section (to build section hierarchies)
+        :return: response from TestRail API containing the newly created test section
+        """
+        if not project_id or project_id is None:
+            raise TestRailValidationException("[!] Invalid project_id")
+
+        if type(project_id) not in [int, float]:
+            raise TestRailValidationException("[!] project_id must be an int or float")
+
+        if project_id <= 0:
+            raise TestRailValidationException("[!] project_id must be > 0")
+
+        if not name or name is None:
+            raise TestRailValidationException("[!] Name field is required")
+
+        if not description or description is None:
+            raise TestRailValidationException("[!] Description field is required")
+
+        try:
+            result = self.yak.section.add_story_section(project_id, parent_id, dict(name=name, description=description))
+        except NewTestRailException as error:
+            raise error
+        else:
+            return result
+
     def get_test_suites(self, project_id):
         """Get a list of test suites associated with a given project_id.
 
@@ -179,6 +265,38 @@ class TestRail:
 
         try:
             result = self.yak.test_suite.get_test_suite(suite_id)
+        except NewTestRailException as error:
+            raise error
+        else:
+            return result
+
+    def add_test_suite(self, project_id, name, description):
+        """Add a new test suite to a TestRail project.
+
+        :param project_id: ID of the TestRail project
+        :param name: name of the new TestRail test suite
+        :param description: description of the test suite
+        :return: response from TestRail API containing the newly created test suite
+        """
+        if not project_id or project_id is None:
+            raise TestRailValidationException("[!] Invalid project_id")
+
+        if type(project_id) not in [int, float]:
+            raise TestRailValidationException("[!] project_id must be an int or float")
+
+        if project_id <= 0:
+            raise TestRailValidationException("[!] project_id must be > 0")
+
+        if not name or name is None:
+            raise TestRailValidationException("[!] Invalid suite name. Unable to add test suite.")
+
+        if not description or description is None:
+            raise TestRailValidationException("[!] Invalid description. Unable to add test suite.")
+
+        suite_data = dict(name=name, description=description)
+
+        try:
+            result = self.yak.test_suite.add_test_suite(project_id, suite_data)
         except NewTestRailException as error:
             raise error
         else:
@@ -228,6 +346,82 @@ class TestRail:
         else:
             return result
 
+    def add_test_case(self, section_id, title, type_id=9, template_id=2, priority_id=None, estimate=None,
+                      milestone_id=None, refs=None):
+        """Add a test case to a project by section_id.
+
+        :param section_id: ID of the TestRail section
+        :param title: title of the test case
+        :param type_id:
+        :param template_id:
+        :param priority_id:
+        :param estimate:
+        :param milestone_id:
+        :param refs:
+        :return: response from TestRail API containing the newly created test case
+        """
+        if not section_id or section_id is None:
+            raise TestRailValidationException("[!] Invalid section_id.")
+
+        if type(section_id) not in [int, float]:
+            raise TestRailValidationException("[!] section_id must be an int or float.")
+
+        if section_id <= 0:
+            raise TestRailValidationException("[!] section_id must be > 0.")
+
+        try:
+            self.get_section(section_id)["parent_id"] is not None
+        except IndexError:
+            raise TestRailValidationException(
+                "[!] parent_id must not be None as that would assign a test case directly to a sprint.")
+
+        if not title or title is None:
+            raise TestRailValidationException("[!] Test case title required.")
+
+        data = dict()
+
+        # validate the optional args
+        if type_id is not None:
+            if type(type_id) != int:
+                raise TestRailValidationException("[!] type_id must be an int or float.")
+            if type_id <= 0:
+                raise TestRailValidationException("[!] type_id must be > 0.")
+            data["type_id"] = type_id
+
+        if template_id is not None:
+            if type(template_id) not in [int, float]:
+                raise TestRailValidationException("[!] template_id must be an int or float.")
+            if template_id <= 0:
+                raise TestRailValidationException("[!] template_id must be > 0.")
+            data["template_id"] = template_id
+
+        if priority_id is not None:
+            if type(priority_id) not in [int, float]:
+                raise TestRailValidationException("[!] priority_id must be an int or float.")
+            if priority_id <= 0:
+                raise TestRailValidationException("[!] priority_id must be > 0.")
+            data["priority_id"] = priority_id
+
+        if estimate is not None:
+            data["estimate"] = estimate
+
+        if milestone_id is not None:
+            if type(milestone_id) not in [int, float]:
+                raise TestRailValidationException("[!] milestone_id must be an int or float.")
+            if milestone_id <= 0:
+                raise TestRailValidationException("[!] milestone_id must be > 0.")
+            data["milestone_id"] = milestone_id
+
+        if refs is not None:
+            data["refs"] = refs
+
+        try:
+            result = self.yak.test_case.add_test_case(section_id, title, data)
+        except NewTestRailException as error:
+            raise error
+        else:
+            return result
+
     def get_test_runs(self, project_id):
         """Get a list of test runs associated with a given project_id.
 
@@ -267,6 +461,69 @@ class TestRail:
 
         try:
             result = self.yak.test_run.get_test_run(run_id)
+        except NewTestRailException as error:
+            raise error
+        else:
+            return result
+
+    def add_test_run(self, project_id, name, description=None, milestone_id=None, assignedto_id=None, include_all=None, case_ids=None, refs=None):
+        """Add a test run to a project.
+
+        :param project_id: ID of the TestRail project
+        :param name: name of the test case
+        :param description:
+        :param milestone_id:
+        :param assignedto_id:
+        :param include_all:
+        :param case_ids:
+        :param refs:
+        :return: response from TestRail API containing the newly created test run
+        """
+        if not project_id or project_id is None:
+            raise TestRailValidationException("[!] Invalid project_id.")
+
+        if type(project_id) not in [int, float]:
+            raise TestRailValidationException("[!] project_id must be an int or float.")
+
+        if project_id <= 0:
+            raise TestRailValidationException("[!] project_id must be > 0.")
+
+        if not name or name is None:
+            raise TestRailValidationException("[!] Test run name value required.")
+
+        data = dict()
+
+        # optional args
+        if description is not None:
+            data["description"] = description
+
+        if milestone_id is not None:
+            if type(milestone_id) not in [int, float]:
+                raise TestRailValidationException("[!] milestone_id must be an int or float.")
+            if milestone_id <= 0:
+                raise TestRailValidationException("[!] milestone_id must be > 0.")
+            data["milestone_id"] = milestone_id
+
+        if assignedto_id is not None:
+            if type(assignedto_id) not in [int, float]:
+                raise TestRailValidationException("[!] assignedto_id must be an int or float.")
+            if assignedto_id <= 0:
+                raise TestRailValidationException("[!] assignedto_id must be > 0.")
+            data["assignedto_id"] = assignedto_id
+
+        if include_all is not None:
+            if type(include_all) != bool:
+                raise TestRailValidationException("[!] include_all must be a boolean.")
+            data["assignedto_id"] = assignedto_id
+
+        if case_ids is not None:
+            data["case_ids"] = case_ids
+
+        if refs is not None:
+            data["refs"] = refs
+
+        try:
+            result = self.yak.test_run.add_test_run(project_id, name, data)
         except NewTestRailException as error:
             raise error
         else:
@@ -355,233 +612,6 @@ class TestRail:
 
         try:
             result = self.yak.test_plan.get_test_plan(plan_id)
-        except NewTestRailException as error:
-            raise error
-        else:
-            return result
-
-    """
-        Setters
-
-        Use these methods to create new entitles using the TestRail REST API. 
-    """
-
-    def add_project(self, name, announcement=None, show_announcement=True, suite_mode=1):
-        """Add a new project to TestRail.
-
-        :param name: name of the new TestRail project
-        :param announcement: brief description of the TestRail project
-        :param show_announcement: a truthy value or True show the announcement, a falsey value or False hides it
-        :param suite_mode: suite mode of the project (1 for single suite mode, 2 for single suite + baselines, 3 for multiple suites)
-        :return: response from TestRail API containing the newly created project
-        """
-        if not name or name is None:
-            raise TestRailValidationException("[!] Invalid project name. Unable to create new project.")
-
-        data = dict(
-            announcement        = announcement,
-            show_announcement   = show_announcement,
-            suite_mode          = suite_mode
-        )
-
-        try:
-            result = self.yak.project.add_project(name, data)
-        except NewTestRailException as error:
-            raise error
-        else:
-            return result
-
-    def add_sprint_section(self, project_id, name):
-        """Add a new section representing a "sprint" to a TestRail project.
-
-        For readability, this separate method is just for adding parent sections (Jira sprints) vs child sections (Jira stories).
-
-        To populate a new child section with a Jira story, use add_story_section() and give it the id value returned here.
-
-        :param project_id: project ID of the TestRail project
-        :param name: name of the new TestRail test section
-        :return: response from TestRail API containing the newly created test section
-        """
-        if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
-
-        if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
-
-        if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
-
-        if not name or name is None:
-            raise TestRailValidationException("[!] Name field is required")
-
-        try:
-            result = self.yak.section.add_sprint_section(project_id, dict(name=name))
-        except NewTestRailException as error:
-            raise error
-        else:
-            return result
-
-    def add_story_section(self, project_id, name, parent_id, description):
-        """Add a new section representing a "story" to a TestRail project.
-
-        This section will be assigned to a parent/child relationship with a parent section, thus parent_id is required.
-
-        Use the id value returned by add_sprint_section as the parent_id.
-
-        Because of this parent id requirement, no suite_id will be needed. If it is ever used in the future, add_sprint_section is the more appropriate place for it.
-
-        :param project_id: project ID of the TestRail project
-        :param name: name of the new TestRail test section
-        :param description: description of the test section
-        :param parent_id: section ID of the parent section (to build section hierarchies)
-        :return: response from TestRail API containing the newly created test section
-        """
-        if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
-
-        if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
-
-        if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
-
-        if not name or name is None:
-            raise TestRailValidationException("[!] Name field is required")
-
-        if not description or description is None:
-            raise TestRailValidationException("[!] Description field is required")
-
-        try:
-            result = self.yak.section.add_story_section(project_id, parent_id, dict(name=name, description=description))
-        except NewTestRailException as error:
-            raise error
-        else:
-            return result
-
-    def add_test_suite(self, project_id, name, description):
-        """Add a new test suite to a TestRail project.
-
-        :param project_id: ID of the TestRail project
-        :param name: name of the new TestRail test suite
-        :param description: description of the test suite
-        :return: response from TestRail API containing the newly created test suite
-        """
-        if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
-
-        if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
-
-        if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
-
-        if not name or name is None:
-            raise TestRailValidationException("[!] Invalid suite name. Unable to add test suite.")
-
-        if not description or description is None:
-            raise TestRailValidationException("[!] Invalid description. Unable to add test suite.")
-
-        suite_data = dict(name=name, description=description)
-
-        try:
-            result = self.yak.test_suite.add_test_suite(project_id, suite_data)
-        except NewTestRailException as error:
-            raise error
-        else:
-            return result
-
-    def add_test_case(self, section_id, title, type_id=9, template_id=None, priority_id=None, estimate=None,
-                      milestone_id=None, refs=None):
-        """Add a test case to a project by section_id.
-
-        :param section_id: ID of the TestRail section
-        :param title: title of the test case
-        :param type_id:
-        :param template_id:
-        :param priority_id:
-        :param estimate:
-        :param milestone_id:
-        :param refs:
-        :return: response from TestRail API containing the newly created test case
-        """
-        if not section_id or section_id is None:
-            raise TestRailValidationException("[!] Invalid section_id.")
-
-        if type(section_id) not in [int, float]:
-            raise TestRailValidationException("[!] section_id must be an int or float.")
-
-        if section_id <= 0:
-            raise TestRailValidationException("[!] section_id must be > 0.")
-
-        try:
-            self.get_section(section_id)["parent_id"] is not None
-        except IndexError:
-            raise TestRailValidationException(
-                "[!] parent_id must not be None as that would assign a test case directly to a sprint.")
-
-        if not title or title is None:
-            raise TestRailValidationException("[!] Test case title required.")
-
-        data = dict(title=title, type_id=type_id)
-
-        # validate the optional args
-        if template_id is not None:
-            if type(template_id) not in [int, float]:
-                raise TestRailValidationException("[!] template_id must be an int or float.")
-            if template_id <= 0:
-                raise TestRailValidationException("[!] template_id must be > 0.")
-            data["template_id"] = template_id
-
-        if priority_id is not None:
-            if type(priority_id) not in [int, float]:
-                raise TestRailValidationException("[!] priority_id must be an int or float.")
-            if priority_id <= 0:
-                raise TestRailValidationException("[!] priority_id must be > 0.")
-            data["priority_id"] = priority_id
-
-        if estimate is not None:
-            data["estimate"] = estimate
-
-        if milestone_id is not None:
-            if type(milestone_id) not in [int, float]:
-                raise TestRailValidationException("[!] milestone_id must be an int or float.")
-            if milestone_id <= 0:
-                raise TestRailValidationException("[!] milestone_id must be > 0.")
-            data["milestone_id"] = milestone_id
-
-        if refs is not None:
-            data["refs"] = refs
-
-        try:
-            result = self.yak.test_case.add_test_case(section_id, title, data)
-        except NewTestRailException as error:
-            raise error
-        else:
-            return result
-
-    def add_test_run(self, project_id, name):
-        """Add a test run to a project.
-
-        :param project_id: ID of the TestRail project
-        :param name: name of the test case
-        :return: response from TestRail API containing the newly created test run
-        """
-        if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id.")
-
-        if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float.")
-
-        if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0.")
-
-        if not name or name is None:
-            raise TestRailValidationException("[!] Test run name value required.")
-
-        data = dict(name=name, include_all=True)
-
-        try:
-            result = self.yak.test_run.add_test_run(project_id, **data)
         except NewTestRailException as error:
             raise error
         else:
