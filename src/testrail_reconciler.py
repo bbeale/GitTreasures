@@ -6,17 +6,14 @@ import os
 
 class TestRailReconciler:
 
-    def __init__(self, testrail, jira, trello, config):
+    def __init__(self, testrail, jira, config):
         """Initialize the TestRailReconciler object to populate TestRail and Trello with Jira stories in need of regression testing.
 
         :param testrail: instance of TestRail
         :param jira: instance of JiraBoard
-        :param trello: instance of TrelloBoard
         """
         if not jira or jira is None:
             raise TRReconcilerException("[!] Initialization fail - missing JiraBoard instance")
-        if not trello or trello is None:
-            raise TRReconcilerException("[!] Initialization fail - missing TrelloBoard instance")
 
         upath = (os.path.relpath(os.path.join("src", "users.ini")))
         self.testers = [t for t in get_configs(["jira_displayname", "trello_id"], upath).values()]
@@ -42,6 +39,7 @@ class TestRailReconciler:
 
         else:
             self.testrail_project_name = "{} Regression Tests".format(pname)
+            self.testrail_testrun_name = "{} Testing".format(pname)
 
     # Jira methods
     def get_jira_project(self):
@@ -413,11 +411,11 @@ class TestRailReconciler:
                 continue
 
         # figure out if a test run already exists
-        has_testrun = True if next(filter(lambda tr: self.testrail_project_name in tr or "Master" in tr, current_testrun_names), None) is not None else False
+        has_testrun = True if next(filter(lambda tr: self.testrail_testrun_name in tr or "Master" in tr, current_testrun_names), None) is not None else False
 
-        # Last think I should have to do is check if there's an existing test plan. If there is, new test cases will automatically be added to it.
+        # Last thing I should have to do is check if there's an existing test plan. If there is, new test cases will automatically be added to it.
         if not has_testrun:
-            self.add_testrail_testrun(self.testrail_project["id"], self.testrail_project["name"])
+            self.add_testrail_testrun(self.testrail_project["id"], self.testrail_testrun_name)
 
 
 class TRReconcilerException(Exception):

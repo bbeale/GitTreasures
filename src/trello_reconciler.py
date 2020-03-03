@@ -68,6 +68,9 @@ class TrelloReconciler:
         self.new_cards              = []
         self._changed               = []
 
+        # URL for the Test Case view in TestRail to add to the Trello card
+        self._testrail_url          = config["testcase_url"]
+
         # 2 stage initialization, ready go!
         self.populate()
 
@@ -281,8 +284,8 @@ class TrelloReconciler:
 
     def trello_updateCurrentCards(self):
         """Update existing Trello cards if the state of the Jira stories they represent has changed."""
-        print("Checking for existing card updates...")
-        cardList = list(filter(lambda t: "{}-".format(self.jira.project_key) in t["name"] and t["listID"] in [self.other_listID, self.todo_listID, self.failed_listID, self.testing_listID], self.trello.cards))
+        print("[+] Checking for existing card updates...")
+        cardList = list(filter(lambda t: self.jira.project_key in t["name"] and t["listID"] in [self.other_listID, self.todo_listID, self.failed_listID, self.testing_listID], self.trello.cards))
         for card in cardList:
 
             jira    = next(filter(lambda j: j["jira_key"] == card["name"], self.jira_qa_statuses), None)
@@ -460,7 +463,8 @@ class TrelloReconciler:
             current_status      = jira_story["current_status"],
             has_failed          = jira_story["has_failed"],
             statuses            = jira_story["statuses"],
-            jira_attachments    = jira_story["attachments"]
+            jira_attachments    = jira_story["attachments"],
+            testrail_url        = self._testrail_url
         )
 
         self.new_cards.append(card)
@@ -507,20 +511,22 @@ class TrelloReconciler:
 
                         card["pos"] = self._last_card_pos
 
-                desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
+                desc = "**{}**\n\n**Ready for QA on:** {}\n**Jira:** {}\n\n**TestRail:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                             card["jira_summary"],
                             card["date"],
                             card["jira_url"],
+                            card["testrail_url"],
                             card["jira_desc"],
                             card["comments"],
                             card["statuses"]
                 )
 
                 if len(desc) > 16384:
-                    desc = "**{}**\n\n**Ready for QA on:** {}\n**Original Jira link:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
+                    desc = "**{}**\n\n**Ready for QA on:** {}\n**Jira:** {}\n\n**TestRail:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                         card["jira_summary"],
                         card["date"],
                         card["jira_url"],
+                        card["testrail_url"],
                         card["jira_desc"],
                         "Too much text -- see Jira story",
                         "Too much text -- see Jira story"
@@ -679,10 +685,7 @@ class TrelloReconciler:
         """
         self.trello_updateCurrentCards()
         self._old_card_names = self.trello_getOldLists()
-
         self.trello_archiveComplete()
-
         self.trello_setNewLists(self.jira_qa_statuses)
         self.new_cards = sorted(self.new_cards, key=lambda c: c["date"])
-
         self.trello_addCardsToBoard()

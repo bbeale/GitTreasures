@@ -82,6 +82,7 @@ try:
         filter_qa_ready     = config["jira"]["filter_qa_ready"],
         project_key         = config["jira"]["project_key"],
         jira_pattern        = r"{}".format(config["git"]["jira_pattern"]),
+        testcase_url        = config["testrail"]["testcase_url"]
     )
 
     # TestRail config values
@@ -106,10 +107,12 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
         "-d", "--dev",
+        action="store_true",
         required=False,
         help="Run the development version of the script")
     parser.add_argument(
         "-tr", "--testrail",
+        action="store_true",
         required=False,
         help="If true, will reconcile TestRail after Trello is complete.")
     return parser.parse_args()
@@ -122,12 +125,12 @@ def main():
 
     Other "versions" that were previously separate files can be called by specifying the command line argument for the thing that the old file used to do
     """
-    print("Starting GitTreasures")
+    print("[+] Starting GitTreasures")
     args = parse_args()
 
     start = time.time()
 
-    # initialize all my non-reconciler classes
+    # initialize all my interface and reconciler classes
     if args.dev:
         trello = TrelloBoard(trello_config, testMode=True)
     else:
@@ -135,19 +138,20 @@ def main():
 
     jira = JiraBoard(jira_config)
     git = GitLabLog(gitlab_config)
-    testrail = TestRail(testrail_config)
 
     # stage 2 init process (really big fan of these it seems)
     trello.populate()
     git.populate()
 
-    # initialize the reconcolers
+    # run the TestRail reconcile process if true
+    if args.testrail:
+        testrail = TestRail(testrail_config)
+        testrail_reconciler = TestRailReconciler(testrail, jira, trr_config)
+        testrail_reconciler.populate_release()
+
+    # initialize the Trello reconciler
     trello_reconciler = TrelloReconciler(jira, git, trello, tr_config)
     trello_reconciler.reconcile()
-    testrail_reconciler = TestRailReconciler(testrail, jira, trello, trr_config)
-
-    if args.testrail:
-        testrail_reconciler.populate_release()
 
     end = time.time()
     duration = int(end) - int(start)
