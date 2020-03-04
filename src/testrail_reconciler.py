@@ -20,21 +20,35 @@ class TestRailReconciler:
 
         print("[+] Grabbing stories from Jira that need regression tests...")
 
-        self.testrail           = testrail
-        self.jira               = jira
+        self.testrail               = testrail
+        self.jira                   = jira
+        self._filter_last_week      = config["filter_last_week"]
+        self._filter_this_release   = config["filter_this_release"]
+        self.jira_project           = None
+        self.jira_board             = None
+        self.current_jira_sprint    = None
+        self.last_week              = None
+        self.done_this_release      = None
+        self.testrail_project_name  = None
+        self.testrail_testrun_name  = None
+        self.testrail_project       = None
+        self.created_suites         = []
 
-        self.created_suites     = []
+        # 2 stage initialization
+        self.populate()
 
-        self.jira_project       = self.get_jira_project()
-        self.jira_board         = self.get_jira_board()
+    def populate(self):
+        """Seocnd stage of reconciler initialization."""
+        self.jira_project = self.get_jira_project()
+        self.jira_board = self.get_jira_board()
         self.current_jira_sprint = self.get_current_jira_sprint(self.jira_board.id)
-        self.last_week          = self.get_jira_stories(config["filter_last_week"])
-        self.done_this_release  = self.get_jira_stories(config["filter_this_release"])
-        self.testrail_project   = None
+        self.last_week = self.get_jira_stories(self._filter_last_week)
+        self.done_this_release = self.get_jira_stories(self._filter_this_release)
 
         try:
             pname = self.current_jira_sprint.name.split("Sprint")[0].strip()
-        except TRReconcilerException("[!] current_jira_sprint undefined. Unable to determine project name from TestRail.") as error:
+        except TRReconcilerException(
+                "[!] current_jira_sprint undefined. Unable to determine project name from TestRail.") as error:
             raise error
 
         else:
