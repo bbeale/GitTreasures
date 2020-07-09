@@ -132,9 +132,8 @@ class TestUtil(TestCase):
             self.fail("Test data issue. Unable to proceed without a valid config file")
 
         result = get_latest_commit(db_path)
-        self.assertIsNotNone(result)
-        self.assertGreaterEqual(len(result[0]), 1)
-        self.assertGreaterEqual(len(result[1]), 1)
+        self.assertIsInstance(result, tuple)
+        self.assertGreaterEqual(result[0], 1)
 
     """
     negative tests for get_latest_commit

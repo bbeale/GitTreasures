@@ -511,7 +511,7 @@ class TrelloReconciler:
 
                         card["pos"] = self._last_card_pos
 
-                desc = "**{}**\n\n**Ready for QA on:** {}\n**Jira:** {}\n\n**TestRail:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
+                desc = "**{}**\n\n**Ready for QA on:** {}\n[**Jira Link**]({})\n\n[**TestRail Link**]({})\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                             card["jira_summary"],
                             card["date"],
                             card["jira_url"],
@@ -522,7 +522,7 @@ class TrelloReconciler:
                 )
 
                 if len(desc) > 16384:
-                    desc = "**{}**\n\n**Ready for QA on:** {}\n**Jira:** {}\n\n**TestRail:** {}\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
+                    desc = "**{}**\n\n**Ready for QA on:** {}\n[**Jira Link**]({})\n\n[**TestRail Link**]({})\n\n---\n\n{}\n\n---\n\nJIRA COMMENTS\n\n{}\n\n---\n\nJIRA STATUS CHANGES\n\n{}".format(
                         card["jira_summary"],
                         card["date"],
                         card["jira_url"],

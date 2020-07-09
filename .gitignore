@@ -12,3 +12,4 @@ config.ini
 users.ini
 trello_lists.ini
 .coverage
+.scannerwork
