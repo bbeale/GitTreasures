@@ -148,7 +148,7 @@ class JiraBoard:
             except JIRAError:
                 print('[!] Failed to get Jira sprints.'.format(str(JIRAError)))
         finally:
-            return next(filter(lambda story: story.state.lower() == 'active' and 'maize yaks' in story.name.lower(), sprints), None)
+            return next(filter(lambda story: story.state.lower() == 'active', sprints), None)
 
     def get_jql_filter(self, filter_id):
         if not filter_id or filter_id is None:
