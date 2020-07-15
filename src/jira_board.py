@@ -344,7 +344,7 @@ class JiraBoard:
     def is_in_staging(self, issue_key, stories):
         """Given am issue_key, check if the story is in the staging branch.
 
-        :param issue_key: a Jira story key (such as AMB-1234)
+        :param issue_key: a Jira story key
         :param stories: a list of Jira stories
         :return boolean: True if story is in staging, otherwise False
         """
@@ -419,7 +419,7 @@ class JiraBoard:
     def for_qa_team(self, issue_key):
         """Similar to passed_qa but checks if a QA tester moved this at any point to make sure it actually got tested.
 
-        :param issue_key: a Jira story key (such as AMB-1234)
+        :param issue_key: a Jira story key
         :return boolean: True if the story has a status change with a valid QA tester, otherwise False
         """
         if not issue_key or issue_key is None:
