@@ -399,45 +399,31 @@ class TestRailReconciler:
         # try to get the current TestRail project
         self.testrail_project = self.get_testrail_project(self.testrail_project_name)
 
-        # also try to get the project for the current release's regression tests
-        self.testrail_r_project = self.get_testrail_project(self.testrail_r_project_name)
-
         # add a new TestRail project for the current release if none is found
         if self.testrail_project is None:
             self.testrail_project = self.testrail.add_project(self.testrail_project_name)
 
-        if self.testrail_r_project is None:
-            self.testrail_r_project = self.testrail.add_project(self.testrail_r_project_name)
-
         # every section in the project -- sprints and stories alike
         all_sections = self.get_testrail_sections(self.testrail_project['id'])
-        all_r_sections = self.get_testrail_sections(self.testrail_r_project['id'])
 
         # get the sprint sections from the list of sections
         sprint_sections = list(filter(lambda s: s['parent_id'] is None, all_sections))
-        sprint_r_sections = list(filter(lambda s: s['parent_id'] is None, all_r_sections))
 
         # get the current sprint from Jira based on our project name
         current_sprint = next(filter(lambda s: s['name'] == self.current_jira_sprint.name, sprint_sections), None)
-        current_r_sprint = next(filter(lambda s: s['name'] == self.current_jira_sprint.name, sprint_r_sections), None)
 
         if current_sprint is None:
             current_sprint = self.add_testrail_sprint(self.testrail_project['id'], self.current_jira_sprint.name)
-        if current_r_sprint is None:
-            current_r_sprint = self.add_testrail_sprint(self.testrail_r_project['id'], self.current_jira_sprint.name)
 
         # get all STORIES, which should always have a parent ID
         story_sections = list(filter(lambda s: s['parent_id'] is not None, all_sections))
         current_sprint_stories = list(filter(lambda s: s['parent_id'] == current_sprint['id'], story_sections))
-        story_r_sections = list(filter(lambda s: s['parent_id'] is not None, all_r_sections))
-        current_r_sprint_stories = list(filter(lambda s: s['parent_id'] == current_sprint['id'], story_r_sections))
 
         # create new TestRail story sections from Jira stories
         new_story_sections = self.populate_testrail_sections(self.testrail_project['id'], self.done_this_release)
 
         release_story_names = [s['name'] for s in story_sections]
         sprint_story_names = [s['name'] for s in current_sprint_stories]
-        regression_story_names = [s['name'] for s in current_r_sprint_stories]
 
         # test run stuff
         current_testruns = self.get_testrail_testruns(self.testrail_project['id'])
@@ -450,15 +436,10 @@ class TestRailReconciler:
 
             in_release = True if next(filter(lambda r: story['jira_key'] in r, release_story_names), None) is not None else False
             in_sprint = True if next(filter(lambda s: story['jira_key'] in s, sprint_story_names), None) is not None else False
-            has_regression_test = True if next(filter(lambda s: story['jira_key'] in s, regression_story_names), None) is not None else False
 
             if not in_release and not in_sprint:
                 new_story_section = self.add_testrail_story(self.testrail_project['id'], name=story['name'], parent_id=current_sprint['id'], description=story['announcement'])
                 self.add_testrail_testcase(new_story_section['id'], title='Placeholder (change my title when you are ready to write me)', refs=story['jira_key'])
-
-            if not has_regression_test:
-                new_r_story_section = self.add_testrail_story(self.testrail_r_project['id'], name=story['name'], parent_id=current_r_sprint['id'], description=story['announcement'])
-                self.add_testrail_testcase(new_r_story_section['id'], template_id=3, title='Regression test', refs=story['jira_key'])
             else:
                 continue
 
@@ -487,14 +468,14 @@ class TestRailReconciler:
         self.jira_staging_transitions(run)
         print('[+] Added defect subtask(s) to Jira.')
 
-    def add_defects_to_jira(self, test_run):
+    def add_defects_to_jira(self, test_run: dict):
         """Add subtasks to Jira for any failures.
 
         :param test_run:
         :return:
         """
-        if test_run is None or len(test_run.key()) == 0:
-            raise TRReconcilerException('[!] Test run reference required.')
+        if len(test_run.keys()) == 0:
+            raise TRReconcilerException('[!] Test run data required.')
 
         parent_story = None
 
@@ -550,6 +531,10 @@ class TestRailReconciler:
 
             # add the subtask to Jira
             self.jira.jira.create_issue(fields=fields)
+
+    def complete_jira_subtask(self, jira_story: str):
+        """ TODO """
+        raise NotImplementedError
 
     def jira_staging_transitions(self, test_run):
         """Transition Jira stories to 'Ready for Staging Release' when all tests pass.
