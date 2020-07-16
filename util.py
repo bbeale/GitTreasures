@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from src.exceptions import (
-    DbPathException,
-    DbQueryAddValueException,
-)
-
+from src.exceptions import DbException
 import configparser
 import sqlite3
 import json
@@ -57,7 +53,7 @@ def is_db_init(db_path):
     :return: True if db is initialized, otherwise False
     """
     if not db_path or db_path is None:
-        raise DbPathException("Database path required for this operation")
+        raise DbException("Database path required for this operation")
 
     if not os.path.exists(db_path):
         return False
@@ -84,7 +80,7 @@ def get_latest_commit(db_path):
     :return: a tuple representing the commit if one was found, otherwise None
     """
     if not db_path or db_path is None:
-        raise DbPathException("Database path required for this operation")
+        raise DbException("Database path required for this operation")
 
     if not os.path.exists(db_path):
         raise FileNotFoundError
@@ -111,7 +107,7 @@ def get_latest_commit_hash(db_path):
     :return:
     """
     if not db_path or db_path is None:
-        raise DbPathException("Database path required for this operation")
+        raise DbException("Database path required for this operation")
 
     if not os.path.exists(db_path):
         raise FileNotFoundError
@@ -133,7 +129,7 @@ def get_stored_commits(db_path, test_file=None):
 
     else:
         if not db_path or db_path is None:
-            raise DbPathException("Database path required for this operation")
+            raise DbException("Database path required for this operation")
 
         if not os.path.exists(db_path):
             raise FileNotFoundError
@@ -174,14 +170,14 @@ def store_commit_data(db_path, values):
     :param values: a dictionary of key_value pairs to add to the databse
     """
     if not db_path or db_path is None:
-        raise DbPathException("Database path required for this operation")
+        raise DbException("Database path required for this operation")
 
     if not os.path.exists(db_path):
         raise FileNotFoundError
 
     if not values or type(values) is not dict \
             or values is None or len(values.keys()) is 0:
-        raise DbQueryAddValueException("values must be a dict with >1 record")
+        raise DbException("values must be a dict with >1 record")
 
     try:
         values["index"] = get_latest_commit(db_path)[0]
@@ -201,13 +197,13 @@ def store_commit_data(db_path, values):
             conn.commit()
             conn.close()
         except sqlite3.Error:
-            print("Hash already exists")
+            print("[!] Hash already exists")
 
 
 def git_db_setup(db_path, ):
     """Set up git database the old way."""
     if not db_path or db_path is None:
-        raise DbPathException("Database path required for this operation")
+        raise DbException("Database path required for this operation")
 
     # Make sure we aren't running inside task_scripts
     if 'task_scripts' in os.path.join(__file__):
@@ -240,7 +236,7 @@ def git_db_setup(db_path, ):
 def gitlab_db_setup(db_path):
     """Set up git database the new way (with GitLabLog)."""
     if not db_path or db_path is None:
-        raise DbPathException("Database path required for this operation")
+        raise DbException("Database path required for this operation")
 
     # create the database
     connection      = sqlite3.connect(db_path)
