@@ -1,23 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from src.exceptions import (
-    ListIdException,
-    CardException,
-    CardNameException,
-    JiraBoardIssueException,
-    JiraBoardFilterException,
-    ReconcileJiraBoardException,
-    ReconcileJiraStoryException,
-    ReconcileGitLogException,
-    ReconcileGitCommitException,
-    ReconcileTrelloBoardException,
-    ReconcileTrelloCardException,
-    ReconcileTrelloListException,
-    UpdateTrelloException
-)
-
+from src.exceptions import TrelloReconcilerException
 from util import get_configs
-
 import sys
 import os
 import re
@@ -33,15 +17,15 @@ class TrelloReconciler:
         :param trello: instance of TrelloBoard
         """
         if not jira or jira is None:
-            raise ReconcileJiraBoardException("Initialization fail - missing JiraBoard instance")
+            raise TrelloReconcilerException("Initialization fail - missing JiraBoard instance")
 
         if not git or git is None:
-            raise ReconcileGitLogException("Initialization fail - missing GitLog instance")
+            raise TrelloReconcilerException("Initialization fail - missing GitLog instance")
 
         if not trello or trello is None:
-            raise ReconcileTrelloBoardException("Initialization fail - missing TrelloBoard instance")
+            raise TrelloReconcilerException("Initialization fail - missing TrelloBoard instance")
 
-        print("Instantiating TrelloReconciler object")
+        print("[+] Initializing TrelloReconciler object")
 
         # Tester credentials import
         upath = (os.path.relpath(os.path.join("src", "users.ini")))
@@ -79,10 +63,8 @@ class TrelloReconciler:
         try:
             self.jira_qa_statuses = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_status))
             self.jira_qa_ready = self.jira.get_parsed_stories(self.jira.get_issues(self.filter_qa_ready))
-        except JiraBoardIssueException:
-            raise JiraBoardIssueException("[!] Issues initialization problem.")
-        except JiraBoardFilterException:
-            raise JiraBoardFilterException("[!] Filter initialization problem.")
+        except TrelloReconcilerException:
+            raise TrelloReconcilerException
 
     # Trello methods
     def trello_getOldFailed(self):
@@ -129,10 +111,10 @@ class TrelloReconciler:
         :return:
         """
         if not card_id or card_id is None:
-            raise ReconcileTrelloCardException("Invalid card_id")
+            raise TrelloReconcilerException("Invalid card_id")
 
         if not label or label is None:
-            raise ReconcileTrelloCardException("Invalid label")
+            raise TrelloReconcilerException("Invalid label")
 
         if color is not None:
             return self.trello.add_new_label(card_id, label, color=color)
@@ -147,10 +129,13 @@ class TrelloReconciler:
         :return: response containing a collection of newly labeled cards
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
 
         if self.jira.is_hotfix(trello_card["name"]):
             self.trello_addCardLabel(trello_card["id"], "hotfix", color="red")
+
+        if self.jira_isDefect(trello_card["name"]):
+            self.trello_addCardLabel(trello_card["id"], "defect", color="pink")
 
         if self.jira_isStagingStory(trello_card["name"]):
             self.trello_addCardLabel(trello_card["id"], "staging", color="green")
@@ -168,7 +153,7 @@ class TrelloReconciler:
         :param tested_by: tester name used to determine QA ownership of tickets
         """
         if not card_id or card_id is None:
-            raise ReconcileTrelloCardException("Invalid card_id")
+            raise TrelloReconcilerException("Invalid card_id")
 
         trello_testerID = None
 
@@ -187,7 +172,7 @@ class TrelloReconciler:
         :param jira_attachments: list of attachment URLs grabbed from the Jira story
         """
         if not card_id or card_id is None:
-            raise ReconcileTrelloCardException("Invalid card_id")
+            raise TrelloReconcilerException("Invalid card_id")
 
 
         for attachment in jira_attachments:
@@ -200,7 +185,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
         return self.jira.is_currently_failed(trello_card["name"]) and trello_card["listID"] != self.failed_listID
 
     def trello_isStaleQaReady(self, trello_card):
@@ -210,7 +195,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
         return self.jira_isStaleQAReady(trello_card["name"]) and (
                 trello_card["listID"] != self.todo_listID and
                 trello_card["listID"] != self.testing_listID
@@ -223,7 +208,7 @@ class TrelloReconciler:
         :return:
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
         return self.jira_isInQaTesting(trello_card["name"]) and trello_card["listID"] != self.testing_listID
 
     def trello_passedQA(self, trello_card):
@@ -233,7 +218,7 @@ class TrelloReconciler:
         :return:
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
         return self.jira_passedQA(trello_card["name"]) and trello_card["listID"] != self.complete_listID
 
     def trello_addCard(self, name, list_id, pos, desc):
@@ -246,11 +231,11 @@ class TrelloReconciler:
         :return:
         """
         if not name or name is None:
-            raise CardNameException("Invalid new card name")
+            raise TrelloReconcilerException("Invalid new card name")
         if not list_id or list_id is None:
-            raise ListIdException("Invalid list_id")
+            raise TrelloReconcilerException("Invalid list_id")
         if not desc or desc is None:
-            raise CardException("Description must be set and cannot be None")
+            raise TrelloReconcilerException("Description must be set and cannot be None")
         if not pos or pos is None:
             pos = "bottom"
         return self.trello.add_new_card(name, list_id, pos, desc)
@@ -262,7 +247,7 @@ class TrelloReconciler:
         :return:
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
         self._changed.append(trello_card["name"])
         return self.trello.delete_card(trello_card["id"])
 
@@ -274,17 +259,17 @@ class TrelloReconciler:
         :return:
         """
         if not trello_card or trello_card is None:
-            raise ReconcileTrelloCardException("Invalid Trello card")
+            raise TrelloReconcilerException("Invalid Trello card")
         if not destination_list_id or destination_list_id is None:
-            raise ReconcileTrelloListException("Invalid destination list_id")
+            raise TrelloReconcilerException("Invalid destination list_id")
         if trello_card["listID"] == destination_list_id:
-            raise ReconcileTrelloListException("Copy would go to the same list")
+            raise TrelloReconcilerException("Copy would go to the same list")
         self._changed.append(trello_card["name"])
         return self.trello.copy_card(trello_card["id"], destination_list_id)
 
     def trello_updateCurrentCards(self):
         """Update existing Trello cards if the state of the Jira stories they represent has changed."""
-        print("[+] Checking for existing card updates...")
+        print("[+] Checking for existing card updates")
         cardList = list(filter(lambda t: self.jira.project_key in t["name"] and t["listID"] in [self.other_listID, self.todo_listID, self.failed_listID, self.testing_listID], self.trello.cards))
         for card in cardList:
 
@@ -320,7 +305,7 @@ class TrelloReconciler:
                 self.trello_copyCard(card, self.todo_listID)
                 continue
 
-            if self.trello_isInQaTesting(card):
+            if self.trello_isInQaTesting(card) and not self.jira_isDefect(card["name"]):
                 self.trello_copyCard(card, self.testing_listID)
                 continue
 
@@ -385,6 +370,10 @@ class TrelloReconciler:
                 self.trello_addToList(story, self.complete_listID)
                 continue
 
+            if self.jira_isDefect(story["jira_key"]):
+                self.trello_addToList(story, self.other_listID)
+                continue
+
             if self.jira_isInQaTesting(story["jira_key"]):
                 self.trello_addToList(story, self.testing_listID)
                 continue
@@ -432,10 +421,10 @@ class TrelloReconciler:
             - if the value is None, use the date that the story was moved to QA in Jira
         """
         if not jira_story or jira_story is None:
-            raise ReconcileJiraStoryException("No Jira story to add")
+            raise TrelloReconcilerException("No Jira story to add")
 
         if not trello_listId or trello_listId is None:
-            raise ReconcileTrelloListException("Invalid Trello list ID")
+            raise TrelloReconcilerException("Invalid Trello list ID")
 
         if commit_date and commit_date is not None:
             sort_date = commit_date
@@ -535,7 +524,7 @@ class TrelloReconciler:
                 try:
                     newcard = self.trello_addCard(card["jira_key"], card["trello_listID"], card["pos"], desc)
 
-                except UpdateTrelloException as e:
+                except TrelloReconcilerException as e:
                     e.msg = "Unable to add a new card to the Trello board"
                     print(e.msg)
                     sys.exit(-1)
@@ -560,7 +549,7 @@ class TrelloReconciler:
         :return:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira.get_labels(jira_key)
 
     def jira_initializeData(self):
@@ -573,7 +562,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira.is_hotfix(jira_key)
 
     def jira_isFreshHotfix(self, jira_key):
@@ -583,7 +572,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira_isHotfix(jira_key) and self.jira_isFreshQaReady(jira_key)
 
     def jira_isStaleHotfix(self, jira_key):
@@ -593,7 +582,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira_isHotfix(jira_key) and self.jira_isStaleQAReady(jira_key)
 
     def jira_isFreshQaReady(self, jira_key):
@@ -603,7 +592,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira.is_fresh_qa_ready(jira_key)
 
     def jira_isStaleQAReady(self, jira_key):
@@ -613,7 +602,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira.is_stale_qa_ready(jira_key)
 
     def jira_keyInCommitMesssage(self, jira_key, commit_message):
@@ -624,9 +613,9 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         if not commit_message or commit_message is None:
-            raise ReconcileGitCommitException("Invalid commit message")
+            raise TrelloReconcilerException("Invalid commit message")
         return jira_key in [a.strip("[]") for a in re.findall(self.jira_key_pattern, commit_message)]
 
     def jira_isStagingStory(self, jira_key):
@@ -636,7 +625,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
 
         commit = next(filter(lambda c: jira_key in c["commitMessage"], self.staging_commits), None)
         result = False
@@ -651,7 +640,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira.is_in_qa_testing(jira_key)
 
     def jira_passedQA(self, jira_key):
@@ -661,7 +650,7 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return self.jira.passed_qa(jira_key)
 
     def jira_isOtherItem(self, jira_key):
@@ -671,8 +660,19 @@ class TrelloReconciler:
         :return boolean:
         """
         if not jira_key or jira_key is None:
-            raise ReconcileJiraStoryException("Invalid jira_key")
+            raise TrelloReconcilerException("Invalid jira_key")
         return jira_key not in self._old_card_names
+
+    def jira_isDefect(self, jira_key):
+        """
+
+        :param jira_key:
+        :return:
+        """
+        if not jira_key or jira_key is None:
+            raise TrelloReconcilerException("Invalid jira_key")
+        issue = self.jira.get_issue(jira_key, 'issuetype')
+        return issue.fields.issuetype.name.lower() == 'defect'
 
     def reconcile(self):
         """Any class named reconciler needs a reconcile method.
