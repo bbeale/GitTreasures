@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from src.exceptions import TestRailException
 from testrail_yak import TestRailYak
 
 
@@ -39,7 +40,7 @@ class TestRail:
         :return: response from TestRail API containing the user
         """
         if not user_id or user_id is None:
-            raise TestRailValidationException("[!] Invalid user_id")
+            raise TestRailException("[!] Invalid user_id")
         try:
             result = self.yak.user.get_user(user_id)
         except TestRailException as error:
@@ -63,13 +64,13 @@ class TestRail:
         :return: response from TestRail API containing the project
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         try:
             result = self.yak.project.get_project(project_id)
@@ -88,7 +89,7 @@ class TestRail:
         :return: response from TestRail API containing the newly created project
         """
         if not name or name is None:
-            raise TestRailValidationException("[!] Invalid project name. Unable to create new project.")
+            raise TestRailException("[!] Invalid project name. Unable to create new project.")
 
         data = dict(
             announcement        = announcement,
@@ -111,20 +112,20 @@ class TestRail:
         :return: response from TestRail API containing the collection of sections
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         if suite_id is not None:
             if type(suite_id) not in [int, float]:
-                raise TestRailValidationException("[!] suite_id must be an int or float")
+                raise TestRailException("[!] suite_id must be an int or float")
 
             if suite_id <= 0:
-                raise TestRailValidationException("[!] suite_id must be > 0")
+                raise TestRailException("[!] suite_id must be > 0")
 
             try:
                 result = self.yak.section.get_sections(project_id, suite_id)
@@ -138,7 +139,7 @@ class TestRail:
                 raise error
 
         if result is None:
-            raise TestRailValidationException("[!] None result detected.")
+            raise TestRailException("[!] None result detected.")
         else:
             return result
 
@@ -149,13 +150,13 @@ class TestRail:
         :return: response from TestRail API containing the test section
         """
         if not section_id or section_id is None:
-            raise TestRailValidationException("[!] Invalid section_id")
+            raise TestRailException("[!] Invalid section_id")
 
         if type(section_id) not in [int, float]:
-            raise TestRailValidationException("[!] section_id must be an int or float")
+            raise TestRailException("[!] section_id must be an int or float")
 
         if section_id <= 0:
-            raise TestRailValidationException("[!] section_id must be > 0")
+            raise TestRailException("[!] section_id must be > 0")
 
         try:
             result = self.yak.section.get_section(section_id)
@@ -176,16 +177,16 @@ class TestRail:
         :return: response from TestRail API containing the newly created test section
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         if not name or name is None:
-            raise TestRailValidationException("[!] Name field is required")
+            raise TestRailException("[!] Name field is required")
 
         try:
             result = self.yak.section.add_sprint_section(project_id, dict(name=name))
@@ -210,19 +211,19 @@ class TestRail:
         :return: response from TestRail API containing the newly created test section
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         if not name or name is None:
-            raise TestRailValidationException("[!] Name field is required")
+            raise TestRailException("[!] Name field is required")
 
         if not description or description is None:
-            raise TestRailValidationException("[!] Description field is required")
+            raise TestRailException("[!] Description field is required")
 
         try:
             result = self.yak.section.add_story_section(project_id, parent_id, dict(name=name, description=description))
@@ -238,13 +239,13 @@ class TestRail:
         :return: response from TestRail API containing the test suites
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         try:
             result = self.yak.test_suite.get_test_suites(project_id)
@@ -260,13 +261,13 @@ class TestRail:
         :return: response from TestRail API containing the test suites
         """
         if not suite_id or suite_id is None:
-            raise TestRailValidationException("[!] Invalid suite_id")
+            raise TestRailException("[!] Invalid suite_id")
 
         if type(suite_id) not in [int, float]:
-            raise TestRailValidationException("[!] suite_id must be an int or float")
+            raise TestRailException("[!] suite_id must be an int or float")
 
         if suite_id <= 0:
-            raise TestRailValidationException("[!] suite_id must be > 0")
+            raise TestRailException("[!] suite_id must be > 0")
 
         try:
             result = self.yak.test_suite.get_test_suite(suite_id)
@@ -284,19 +285,19 @@ class TestRail:
         :return: response from TestRail API containing the newly created test suite
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         if not name or name is None:
-            raise TestRailValidationException("[!] Invalid suite name. Unable to add test suite.")
+            raise TestRailException("[!] Invalid suite name. Unable to add test suite.")
 
         if not description or description is None:
-            raise TestRailValidationException("[!] Invalid description. Unable to add test suite.")
+            raise TestRailException("[!] Invalid description. Unable to add test suite.")
 
         suite_data = dict(name=name, description=description)
 
@@ -314,13 +315,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         try:
             result = self.yak.test_case.get_test_cases(project_id)
@@ -336,13 +337,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not case_id or case_id is None:
-            raise TestRailValidationException("[!] Invalid case_id")
+            raise TestRailException("[!] Invalid case_id")
 
         if type(case_id) not in [int, float]:
-            raise TestRailValidationException("[!] case_id must be an int or float")
+            raise TestRailException("[!] case_id must be an int or float")
 
         if case_id <= 0:
-            raise TestRailValidationException("[!] case_id must be > 0")
+            raise TestRailException("[!] case_id must be > 0")
 
         try:
             result = self.yak.test_case.get_test_case(case_id)
@@ -366,45 +367,45 @@ class TestRail:
         :return: response from TestRail API containing the newly created test case
         """
         if not section_id or section_id is None:
-            raise TestRailValidationException("[!] Invalid section_id.")
+            raise TestRailException("[!] Invalid section_id.")
 
         if type(section_id) not in [int, float]:
-            raise TestRailValidationException("[!] section_id must be an int or float.")
+            raise TestRailException("[!] section_id must be an int or float.")
 
         if section_id <= 0:
-            raise TestRailValidationException("[!] section_id must be > 0.")
+            raise TestRailException("[!] section_id must be > 0.")
 
         try:
             self.get_section(section_id)["parent_id"] is not None
         except IndexError:
-            raise TestRailValidationException(
+            raise TestRailException(
                 "[!] parent_id must not be None as that would assign a test case directly to a sprint.")
 
         if not title or title is None:
-            raise TestRailValidationException("[!] Test case title required.")
+            raise TestRailException("[!] Test case title required.")
 
         data = dict()
 
         # validate the optional args
         if type_id is not None:
             if type(type_id) != int:
-                raise TestRailValidationException("[!] type_id must be an int or float.")
+                raise TestRailException("[!] type_id must be an int or float.")
             if type_id <= 0:
-                raise TestRailValidationException("[!] type_id must be > 0.")
+                raise TestRailException("[!] type_id must be > 0.")
             data["type_id"] = type_id
 
         if template_id is not None:
             if type(template_id) not in [int, float]:
-                raise TestRailValidationException("[!] template_id must be an int or float.")
+                raise TestRailException("[!] template_id must be an int or float.")
             if template_id <= 0:
-                raise TestRailValidationException("[!] template_id must be > 0.")
+                raise TestRailException("[!] template_id must be > 0.")
             data["template_id"] = template_id
 
         if priority_id is not None:
             if type(priority_id) not in [int, float]:
-                raise TestRailValidationException("[!] priority_id must be an int or float.")
+                raise TestRailException("[!] priority_id must be an int or float.")
             if priority_id <= 0:
-                raise TestRailValidationException("[!] priority_id must be > 0.")
+                raise TestRailException("[!] priority_id must be > 0.")
             data["priority_id"] = priority_id
 
         if estimate is not None:
@@ -412,9 +413,9 @@ class TestRail:
 
         if milestone_id is not None:
             if type(milestone_id) not in [int, float]:
-                raise TestRailValidationException("[!] milestone_id must be an int or float.")
+                raise TestRailException("[!] milestone_id must be an int or float.")
             if milestone_id <= 0:
-                raise TestRailValidationException("[!] milestone_id must be > 0.")
+                raise TestRailException("[!] milestone_id must be > 0.")
             data["milestone_id"] = milestone_id
 
         if refs is not None:
@@ -434,13 +435,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         try:
             result = self.yak.test_run.get_test_runs(project_id)
@@ -456,13 +457,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not run_id or run_id is None:
-            raise TestRailValidationException("[!] Invalid run_id")
+            raise TestRailException("[!] Invalid run_id")
 
         if type(run_id) not in [int, float]:
-            raise TestRailValidationException("[!] run_id must be an int or float")
+            raise TestRailException("[!] run_id must be an int or float")
 
         if run_id <= 0:
-            raise TestRailValidationException("[!] run_id must be > 0")
+            raise TestRailException("[!] run_id must be > 0")
 
         try:
             result = self.yak.test_run.get_test_run(run_id)
@@ -485,16 +486,16 @@ class TestRail:
         :return: response from TestRail API containing the newly created test run
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id.")
+            raise TestRailException("[!] Invalid project_id.")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float.")
+            raise TestRailException("[!] project_id must be an int or float.")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0.")
+            raise TestRailException("[!] project_id must be > 0.")
 
         if not name or name is None:
-            raise TestRailValidationException("[!] Test run name value required.")
+            raise TestRailException("[!] Test run name value required.")
 
         data = dict()
 
@@ -504,21 +505,21 @@ class TestRail:
 
         if milestone_id is not None:
             if type(milestone_id) not in [int, float]:
-                raise TestRailValidationException("[!] milestone_id must be an int or float.")
+                raise TestRailException("[!] milestone_id must be an int or float.")
             if milestone_id <= 0:
-                raise TestRailValidationException("[!] milestone_id must be > 0.")
+                raise TestRailException("[!] milestone_id must be > 0.")
             data["milestone_id"] = milestone_id
 
         if assignedto_id is not None:
             if type(assignedto_id) not in [int, float]:
-                raise TestRailValidationException("[!] assignedto_id must be an int or float.")
+                raise TestRailException("[!] assignedto_id must be an int or float.")
             if assignedto_id <= 0:
-                raise TestRailValidationException("[!] assignedto_id must be > 0.")
+                raise TestRailException("[!] assignedto_id must be > 0.")
             data["assignedto_id"] = assignedto_id
 
         if include_all is not None:
             if type(include_all) != bool:
-                raise TestRailValidationException("[!] include_all must be a boolean.")
+                raise TestRailException("[!] include_all must be a boolean.")
             data["assignedto_id"] = assignedto_id
 
         if case_ids is not None:
@@ -541,13 +542,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not run_id or run_id is None:
-            raise TestRailValidationException("[!] Invalid run_id")
+            raise TestRailException("[!] Invalid run_id")
 
         if type(run_id) not in [int, float]:
-            raise TestRailValidationException("[!] run_id must be an int or float")
+            raise TestRailException("[!] run_id must be an int or float")
 
         if run_id <= 0:
-            raise TestRailValidationException("[!] run_id must be > 0")
+            raise TestRailException("[!] run_id must be > 0")
 
         try:
             result = self.yak.test.get_test_run_tests(run_id)
@@ -563,13 +564,13 @@ class TestRail:
         :return: response from TestRail API containing the test
         """
         if not test_id or test_id is None:
-            raise TestRailValidationException("[!] Invalid test_id")
+            raise TestRailException("[!] Invalid test_id")
 
         if type(test_id) not in [int, float]:
-            raise TestRailValidationException("[!] test_id must be an int or float")
+            raise TestRailException("[!] test_id must be an int or float")
 
         if test_id <= 0:
-            raise TestRailValidationException("[!] test_id must be > 0")
+            raise TestRailException("[!] test_id must be > 0")
 
         try:
             result = self.yak.test.get_test_run_test(test_id)
@@ -585,13 +586,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id")
+            raise TestRailException("[!] Invalid project_id")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float")
+            raise TestRailException("[!] project_id must be an int or float")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0")
+            raise TestRailException("[!] project_id must be > 0")
 
         try:
             result = self.yak.test_plan.get_test_plans(project_id)
@@ -607,13 +608,13 @@ class TestRail:
         :return: response from TestRail API containing the test cases
         """
         if not plan_id or plan_id is None:
-            raise TestRailValidationException("[!] Invalid plan_id")
+            raise TestRailException("[!] Invalid plan_id")
 
         if type(plan_id) not in [int, float]:
-            raise TestRailValidationException("[!] plan_id must be an int or float")
+            raise TestRailException("[!] plan_id must be an int or float")
 
         if plan_id <= 0:
-            raise TestRailValidationException("[!] plan_id must be > 0")
+            raise TestRailException("[!] plan_id must be > 0")
 
         try:
             result = self.yak.test_plan.get_test_plan(plan_id)
@@ -630,16 +631,16 @@ class TestRail:
         :return: response from TestRail API containing the newly created test plan
         """
         if not project_id or project_id is None:
-            raise TestRailValidationException("[!] Invalid project_id.")
+            raise TestRailException("[!] Invalid project_id.")
 
         if type(project_id) not in [int, float]:
-            raise TestRailValidationException("[!] project_id must be an int or float.")
+            raise TestRailException("[!] project_id must be an int or float.")
 
         if project_id <= 0:
-            raise TestRailValidationException("[!] project_id must be > 0.")
+            raise TestRailException("[!] project_id must be > 0.")
 
         if not name or name is None:
-            raise TestRailValidationException("[!] Test plan name value required.")
+            raise TestRailException("[!] Test plan name value required.")
 
         # data = dict(name=name, include_all=True)
 
@@ -657,13 +658,13 @@ class TestRail:
         :return:
         """
         if not test_id or test_id is None:
-            raise TestRailValidationException("[!] Invalid test_id")
+            raise TestRailException("[!] Invalid test_id")
 
         if type(test_id) not in [int, float]:
-            raise TestRailValidationException("[!] test_id must be an int or float")
+            raise TestRailException("[!] test_id must be an int or float")
 
         if test_id <= 0:
-            raise TestRailValidationException("[!] test_id must be > 0")
+            raise TestRailException("[!] test_id must be > 0")
 
         try:
             result = self.yak.test_result.get_test_results(test_id)
@@ -680,22 +681,22 @@ class TestRail:
         :return:
         """
         if not run_id or run_id is None:
-            raise TestRailValidationException("[!] Invalid run_id")
+            raise TestRailException("[!] Invalid run_id")
 
         if type(run_id) not in [int, float]:
-            raise TestRailValidationException("[!] run_id must be an int or float")
+            raise TestRailException("[!] run_id must be an int or float")
 
         if run_id <= 0:
-            raise TestRailValidationException("[!] run_id must be > 0")
+            raise TestRailException("[!] run_id must be > 0")
 
         if not case_id or case_id is None:
-            raise TestRailValidationException("[!] Invalid case_id")
+            raise TestRailException("[!] Invalid case_id")
 
         if type(case_id) not in [int, float]:
-            raise TestRailValidationException("[!] case_id must be an int or float")
+            raise TestRailException("[!] case_id must be an int or float")
 
         if case_id <= 0:
-            raise TestRailValidationException("[!] case_id must be > 0")
+            raise TestRailException("[!] case_id must be > 0")
 
         try:
             result = self.yak.test_result.get_testcase_test_results(run_id, case_id)
@@ -711,13 +712,13 @@ class TestRail:
 =        :return:
         """
         if not run_id or run_id is None:
-            raise TestRailValidationException("[!] Invalid run_id")
+            raise TestRailException("[!] Invalid run_id")
 
         if type(run_id) not in [int, float]:
-            raise TestRailValidationException("[!] run_id must be an int or float")
+            raise TestRailException("[!] run_id must be an int or float")
 
         if run_id <= 0:
-            raise TestRailValidationException("[!] run_id must be > 0")
+            raise TestRailException("[!] run_id must be > 0")
 
         try:
             result = self.yak.test_result.get_testrun_test_results(run_id)
@@ -725,11 +726,3 @@ class TestRail:
             raise error
         else:
             return result
-
-
-class TestRailException(Exception):
-    pass
-
-
-class TestRailValidationException(ValueError):
-    pass

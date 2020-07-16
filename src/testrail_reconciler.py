@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from src.exceptions import TestRailReconcilerException
 from util import get_configs
 import os
-
-
-class TRReconcilerException(Exception):
-    pass
 
 
 class TestRailReconciler:
@@ -17,7 +14,7 @@ class TestRailReconciler:
         :param jira: instance of JiraBoard
         """
         if not jira or jira is None:
-            raise TRReconcilerException('[!] Initialization fail - missing JiraBoard instance')
+            raise TestRailReconcilerException('[!] Initialization fail - missing JiraBoard instance')
 
         upath = (os.path.relpath(os.path.join('src', 'users.ini')))
         self.testers = [t for t in get_configs(['jira_displayname', 'trello_id'], upath).values()]
@@ -33,10 +30,7 @@ class TestRailReconciler:
         self.done_this_release = None
         self.testrail_project_name = None
         self.testrail_testrun_name = None
-        self.testrail_r_project_name = None
-        self.testrail_r_testrun_name = None
         self.testrail_project = None
-        self.testrail_r_project = None
         self.testrail_testruns = None
         self.test_results = []
         self.failed = []
@@ -53,22 +47,14 @@ class TestRailReconciler:
         self.done_this_release = self.get_jira_stories(self._filter_this_release)
 
         try:
-            pname = self.current_jira_sprint.name   # .split('Sprint')[0].strip()
-        except TRReconcilerException(
+            pname = self.current_jira_sprint.name
+        except TestRailReconcilerException(
                 '[!] current_jira_sprint undefined. Unable to determine project name from TestRail.') as error:
             raise error
 
         else:
-            # Use a different program for debugging so we don't mess up the main test repo
-            # self.testrail_project_name = '{} Tests [DEV]'.format(pname)
-            # self.testrail_testrun_name = '{} Testing [DEV]'.format(pname)
-            # self.testrail_r_project_name = '{} Regression Tests [DEV]'.format(pname)
-            # self.testrail_r_testrun_name = '{} Regression Testing [DEV]'.format(pname)
-
             self.testrail_project_name = '{} Tests'.format(pname)
             self.testrail_testrun_name = '{} Testing'.format(pname)
-            self.testrail_r_project_name = '{} Regression Tests'.format(pname)
-            self.testrail_r_testrun_name = '{} Regression Testing'.format(pname)
 
     # Jira methods
     def get_jira_project(self):
@@ -95,7 +81,7 @@ class TestRailReconciler:
         :return: the current sprint if one exists that matches criteria
         """
         if not board_id or board_id is None:
-            raise TRReconcilerException('[!] Invalid board ID')
+            raise TestRailReconcilerException('[!] Invalid board ID')
         return self.jira.get_current_sprint(board_id)
 
     def get_jira_stories(self, filter_id):
@@ -105,7 +91,7 @@ class TestRailReconciler:
         :return: list of stories returned by the filter
         """
         if not filter_id or filter_id is None:
-            raise TRReconcilerException('[!] Invalid filter ID')
+            raise TestRailReconcilerException('[!] Invalid filter ID')
         return self.jira.get_parsed_stories(self.jira.get_issues(filter_id), testrail_mode=True)
 
     def update_jira_filter(self, filter_id, query):
@@ -116,9 +102,9 @@ class TestRailReconciler:
         :return: JSON representation of the filter
         """
         if not filter_id or filter_id is None:
-            raise TRReconcilerException('[!] Invalid filter ID')
+            raise TestRailReconcilerException('[!] Invalid filter ID')
         if not query or query is None:
-            raise TRReconcilerException('[!] Invalid query')
+            raise TestRailReconcilerException('[!] Invalid query')
         return self.jira.update_filter(filter_id, query)
 
     def new_jira_filter(self, name, query):
@@ -129,9 +115,9 @@ class TestRailReconciler:
         :return: JSON representation of the filter
         """
         if not name or name is None:
-            raise TRReconcilerException('[!] Invalid name')
+            raise TestRailReconcilerException('[!] Invalid name')
         if not query or query is None:
-            raise TRReconcilerException('[!] Invalid query')
+            raise TestRailReconcilerException('[!] Invalid query')
         return self.jira.add_new_filter(name, query)
 
     def is_for_qa(self, key):
@@ -141,7 +127,7 @@ class TestRailReconciler:
         :return:
         """
         if not key or key is None:
-            raise TRReconcilerException('[!] Invalid key.')
+            raise TestRailReconcilerException('[!] Invalid key.')
         return self.jira.for_qa_team(key)
 
     # TestRail methods
@@ -153,9 +139,9 @@ class TestRailReconciler:
         :return boolean: True if the test suite exists, False if not
         """
         if not jira_key or jira_key is None:
-            raise TRReconcilerException('[!] Invalid jira_key')
+            raise TestRailReconcilerException('[!] Invalid jira_key')
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         test_suites = self.testrail.get_test_suites(project_id)
         test_suite  = next(filter(lambda s: jira_key.lower() in s['name'].lower(), test_suites), None)
@@ -168,7 +154,7 @@ class TestRailReconciler:
         :return: the 'name' field of a TestRail project if it exists, otherwise None
         """
         if not name or name is None:
-            raise TRReconcilerException('[!] Invalid project name')
+            raise TestRailReconcilerException('[!] Invalid project name')
         return next(filter(lambda p: p['name'] == name, self.testrail.get_projects()), None)
 
     def get_testrail_sections(self, project_id):
@@ -178,13 +164,13 @@ class TestRailReconciler:
         :return:
         """
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         if type(project_id) not in [int, float]:
-            raise TRReconcilerException('[!] project_id must be an int or float')
+            raise TestRailReconcilerException('[!] project_id must be an int or float')
 
         if project_id <= 0:
-            raise TRReconcilerException('[!] project_id must be > 0')
+            raise TestRailReconcilerException('[!] project_id must be > 0')
 
         return self.testrail.get_sections(project_id)
 
@@ -195,13 +181,13 @@ class TestRailReconciler:
         :return:
         """
         if not section_id or section_id is None:
-            raise TRReconcilerException('[!] Invalid section_id')
+            raise TestRailReconcilerException('[!] Invalid section_id')
 
         if type(section_id) not in [int, float]:
-            raise TRReconcilerException('[!] section_id must be an int or float')
+            raise TestRailReconcilerException('[!] section_id must be an int or float')
 
         if section_id <= 0:
-            raise TRReconcilerException('[!] section_id must be > 0')
+            raise TestRailReconcilerException('[!] section_id must be > 0')
 
         return self.testrail.get_section(section_id)
 
@@ -212,13 +198,13 @@ class TestRailReconciler:
         :return:
         """
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         if type(project_id) not in [int, float]:
-            raise TRReconcilerException('[!] project_id must be an int or float')
+            raise TestRailReconcilerException('[!] project_id must be an int or float')
 
         if project_id <= 0:
-            raise TRReconcilerException('[!] project_id must be > 0')
+            raise TestRailReconcilerException('[!] project_id must be > 0')
 
         return self.testrail.get_test_runs(project_id)
 
@@ -230,7 +216,7 @@ class TestRailReconciler:
         :return list: list of items to add to TestRail
         """
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         sections = []
         for js in jira_stories:
@@ -251,16 +237,16 @@ class TestRailReconciler:
         :return:
         """
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         if type(project_id) not in [int, float]:
-            raise TRReconcilerException('[!] project_id must be an int or float')
+            raise TestRailReconcilerException('[!] project_id must be an int or float')
 
         if project_id <= 0:
-            raise TRReconcilerException('[!] project_id must be > 0')
+            raise TestRailReconcilerException('[!] project_id must be > 0')
 
         if not name or name is None:
-            raise TRReconcilerException('[!] name is required.')
+            raise TestRailReconcilerException('[!] name is required.')
 
         return self.testrail.add_sprint_section(project_id, name)
 
@@ -274,28 +260,28 @@ class TestRailReconciler:
         :return:
         """
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         if type(project_id) not in [int, float]:
-            raise TRReconcilerException('[!] project_id must be an int or float')
+            raise TestRailReconcilerException('[!] project_id must be an int or float')
 
         if project_id <= 0:
-            raise TRReconcilerException('[!] project_id must be > 0')
+            raise TestRailReconcilerException('[!] project_id must be > 0')
 
         if not name or name is None:
-            raise TRReconcilerException('[!] name is required.')
+            raise TestRailReconcilerException('[!] name is required.')
 
         if not description or description is None:
-            raise TRReconcilerException('[!] description is required.')
+            raise TestRailReconcilerException('[!] description is required.')
 
         if not parent_id or parent_id is None:
-            raise TRReconcilerException('[!] Invalid parent_id')
+            raise TestRailReconcilerException('[!] Invalid parent_id')
 
         if type(parent_id) not in [int, float]:
-            raise TRReconcilerException('[!] parent_id must be an int or float')
+            raise TestRailReconcilerException('[!] parent_id must be an int or float')
 
         if parent_id <= 0:
-            raise TRReconcilerException('[!] parent_id must be > 0')
+            raise TestRailReconcilerException('[!] parent_id must be > 0')
 
         return self.testrail.add_story_section(project_id, name, parent_id, description)
 
@@ -313,16 +299,16 @@ class TestRailReconciler:
         :return:
         """
         if not story_section_id or story_section_id is None:
-            raise TRReconcilerException('[!] Need a section_id for a story to add a test case.')
+            raise TestRailReconcilerException('[!] Need a section_id for a story to add a test case.')
 
         if type(story_section_id) not in [int, float]:
-            raise TRReconcilerException('[!] story_section_id must be an int or float')
+            raise TestRailReconcilerException('[!] story_section_id must be an int or float')
 
         if story_section_id <= 0:
-            raise TRReconcilerException('[!] story_section_id must be > 0')
+            raise TestRailReconcilerException('[!] story_section_id must be > 0')
 
         if not title or title is None:
-            raise TRReconcilerException('[!] A valid title is required.')
+            raise TestRailReconcilerException('[!] A valid title is required.')
 
         data = dict()
 
@@ -360,16 +346,16 @@ class TestRailReconciler:
         :return:
         """
         if not project_id or project_id is None:
-            raise TRReconcilerException('[!] Invalid project_id')
+            raise TestRailReconcilerException('[!] Invalid project_id')
 
         if type(project_id) not in [int, float]:
-            raise TRReconcilerException('[!] project_id must be an int or float')
+            raise TestRailReconcilerException('[!] project_id must be an int or float')
 
         if project_id <= 0:
-            raise TRReconcilerException('[!] project_id must be > 0')
+            raise TestRailReconcilerException('[!] project_id must be > 0')
 
         if not name or name is None:
-            raise TRReconcilerException('[!] A valid name is required.')
+            raise TestRailReconcilerException('[!] A valid name is required.')
 
         data = dict()
 
@@ -454,7 +440,7 @@ class TestRailReconciler:
         """Get results from TestRail test run. """
         run = next(filter(lambda tr: tr['name'] == self.testrail_testrun_name, self.get_testrail_testruns(self.testrail_project['id'])), None)
         if run is None:
-            raise TRReconcilerException('[!] Test run {} not found.'.format(self.testrail_testrun_name))
+            raise TestRailReconcilerException('[!] Test run {} not found.'.format(self.testrail_testrun_name))
 
         if run['failed_count'] == 0:
             print('[+] No new test failures found.')
@@ -471,11 +457,13 @@ class TestRailReconciler:
     def add_defects_to_jira(self, test_run: dict):
         """Add subtasks to Jira for any failures.
 
+        TODO, since we are officially using subtasks
+
         :param test_run:
         :return:
         """
         if len(test_run.keys()) == 0:
-            raise TRReconcilerException('[!] Test run data required.')
+            raise TestRailReconcilerException('[!] Test run data required.')
 
         parent_story = None
 
@@ -543,7 +531,7 @@ class TestRailReconciler:
         :return:
         """
         if test_run is None or len(test_run.key()) == 0:
-            raise TRReconcilerException('[!] Test run reference required.')
+            raise TestRailReconcilerException('[!] Test run reference required.')
 
         for p in self.passed:
             # get the AMB number

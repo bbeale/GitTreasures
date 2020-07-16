@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from datetime import datetime, timedelta
-from src.exceptions import (
-    GitLabLogRepoPathException,
-    GitLabLogTokenException,
-    GitLabLogProjectException,
-    GitLabLogQueryException
-)
-
 from util import store_commit_data, get_latest_commit, get_stored_commits
-
+from src.exceptions import GitLabLogException
+from datetime import datetime, timedelta
 import sqlite3
 import gitlab
 import sys
@@ -55,15 +48,15 @@ class GitLabLog:
         :return:
         """
         if not repopath or repopath is None:
-            raise GitLabLogRepoPathException('[!] Invalid repository path')
+            raise GitLabLogException('[!] Invalid repository path')
         if not token or token is None:
-            raise GitLabLogTokenException('[!] Invalid API token')
+            raise GitLabLogException('[!] Invalid API token')
         if not project_id or project_id is None:
-            raise GitLabLogProjectException('[!] Invalid project_id')
+            raise GitLabLogException('[!] Invalid project_id')
         if not query_params or query_params is None:
-            raise GitLabLogQueryException('[!] Invalid query_params')
+            raise GitLabLogException('[!] Invalid query_params')
 
-        print('[+] Going through commit data from GitLab...')
+        print('[+] Analyzing commit data from GitLab')
         with gitlab.Gitlab(repopath, private_token=token) as gl:
             gl.auth()
             gl_project              = gl.projects.get(project_id)
