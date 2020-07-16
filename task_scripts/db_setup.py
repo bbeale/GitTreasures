@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from src.git_log import GitLog
+from src.gitlab_log import GitLabLog
 from util import git_db_setup, is_db_init
 
 import configparser
@@ -42,7 +42,7 @@ def main():
         sys.exit(-1)
 
     git_db_setup(git_config["db_path"])
-    gl = GitLog(git_config)
+    gl = GitLabLog(git_config)
 
     try:
         gl.populate()
