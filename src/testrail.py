@@ -128,13 +128,13 @@ class TestRail:
                 raise TestRailException("[!] suite_id must be > 0")
 
             try:
-                result = self.yak.section.get_sections(project_id, suite_id)
+                result = self.yak.section.get_sections_by_suite_id(project_id, suite_id)
             except TestRailException as error:
                 raise error
 
         else:
             try:
-                result = self.yak.section.get_sections(project_id, suite_id)
+                result = self.yak.section.get_sections(project_id)
             except TestRailException as error:
                 raise error
 

@@ -22,7 +22,7 @@ class TrelloBoard:
         if not config or config is None:
             raise ValueError('[!] Invalid configs')
 
-        listpath = os.path.relpath(os.path.join('src', 'trello_lists.ini'))
+        listpath = os.path.relpath(os.path.join('config', 'trello_lists.ini'))
         lists = get_configs(['other', 'todo', 'fail', 'testing', 'complete'], listpath)
 
         self.testMode           = testMode
@@ -566,7 +566,7 @@ class TrelloBoard:
             raise TrelloBoardException('[!] Invalid destination idList')
 
         try:
-            self.trello.lists.move_all_cards(list_id, idBoard, idList)
+            self.trello.lists.new_moveAllCard_idList(idList=list_id, idBoard=idBoard, idList2=idList)
         except HTTPError as httpe:
             print(httpe.response.status_code, '- Unable to move cards.')
             raise TrelloBoardException

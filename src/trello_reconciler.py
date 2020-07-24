@@ -28,7 +28,7 @@ class TrelloReconciler:
         print("[+] Initializing TrelloReconciler object")
 
         # Tester credentials import
-        upath = (os.path.relpath(os.path.join("src", "users.ini")))
+        upath = (os.path.relpath(os.path.join("config", "users.ini")))
         self.testers = [t for t in get_configs(["jira_displayname", "trello_id"], upath).values()]
 
         self.jira                   = jira
@@ -134,7 +134,7 @@ class TrelloReconciler:
         if self.jira.is_hotfix(trello_card["name"]):
             self.trello_addCardLabel(trello_card["id"], "hotfix", color="red")
 
-        if self.jira_isDefect(trello_card["name"]):
+        if self.jira_hasSubtasks(trello_card["name"]):
             self.trello_addCardLabel(trello_card["id"], "defect", color="pink")
 
         if self.jira_isStagingStory(trello_card["name"]):
@@ -305,7 +305,7 @@ class TrelloReconciler:
                 self.trello_copyCard(card, self.todo_listID)
                 continue
 
-            if self.trello_isInQaTesting(card) and not self.jira_isDefect(card["name"]):
+            if self.trello_isInQaTesting(card):
                 self.trello_copyCard(card, self.testing_listID)
                 continue
 
@@ -371,7 +371,7 @@ class TrelloReconciler:
                 continue
 
             if self.jira_isDefect(story["jira_key"]):
-                self.trello_addToList(story, self.other_listID)
+                # don't add a card if it's a defect
                 continue
 
             if self.jira_isInQaTesting(story["jira_key"]):
@@ -664,15 +664,25 @@ class TrelloReconciler:
         return jira_key not in self._old_card_names
 
     def jira_isDefect(self, jira_key):
-        """
+        """Return True if it is a defect issuetype.
 
         :param jira_key:
         :return:
         """
         if not jira_key or jira_key is None:
             raise TrelloReconcilerException("Invalid jira_key")
-        issue = self.jira.get_issue(jira_key, 'issuetype')
-        return issue.fields.issuetype.name.lower() == 'defect'
+        return self.jira.is_defect(jira_key)
+
+    def jira_hasSubtasks(self, jira_key):
+        """Return True if it is a story has subtasks.
+
+        :param jira_key:
+        :return:
+        """
+        if not jira_key or jira_key is None:
+            raise TrelloReconcilerException("Invalid jira_key")
+        issue = self.jira.get_issue(jira_key, 'subtasks')
+        return len(issue.fields.subtasks) > 0
 
     def reconcile(self):
         """Any class named reconciler needs a reconcile method.

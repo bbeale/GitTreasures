@@ -32,7 +32,7 @@ if not is_db_init(db_path):
 config = configparser.ConfigParser()
 
 try:
-    config.read(os.path.relpath('config.ini'))
+    config.read(os.path.join('config', 'config.ini'))
 except OSError as e:
     print(e, 'Cannot get settings from config file')
     sys.exit(1)

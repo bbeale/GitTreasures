@@ -6,7 +6,9 @@ from util import (
     get_latest_commit,
     get_latest_commit_hash
 )
+
 from src.exceptions import DbException
+
 from unittest import TestCase
 import os
 
@@ -85,7 +87,7 @@ class TestUtil(TestCase):
     """
     def test_is_db_init_success(self):
 
-        config_path     = "../config.ini"
+        config_path     = "../config/config.ini"
         db_path         = "../{}".format(
             get_configs(["db_path"], config_path)["common"]["db_path"]
         )
@@ -119,7 +121,7 @@ class TestUtil(TestCase):
     positive tests for get_latest_commit
     """
     def test_get_latest_commit_success(self):
-        config_path     = "../config.ini"
+        config_path     = "../config/config.ini"
         db_path         = "../{}".format(
             get_configs(["db_path"], config_path)["common"]["db_path"]
         )
@@ -154,7 +156,7 @@ class TestUtil(TestCase):
     positive tests for get_latest_commit_hash
     """
     def test_get_latest_commit_hash_success(self):
-        config_path     = "../config.ini"
+        config_path     = "../config/config.ini"
         db_path         = "../{}".format(
             get_configs(["db_path"], config_path)["common"]["db_path"]
         )

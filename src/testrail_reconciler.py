@@ -16,7 +16,7 @@ class TestRailReconciler:
         if not jira or jira is None:
             raise TestRailReconcilerException('[!] Initialization fail - missing JiraBoard instance')
 
-        upath = (os.path.relpath(os.path.join('src', 'users.ini')))
+        upath = (os.path.relpath(os.path.join('config', 'users.ini')))
         self.testers = [t for t in get_configs(['jira_displayname', 'trello_id'], upath).values()]
 
         print('[+] Grabbing Jira stories for TestRail...')

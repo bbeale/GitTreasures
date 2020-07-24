@@ -1,15 +1,16 @@
 .idea/*
-data/*
 repos/*
 .gitignore
 *pycache*
 *.pyc
 *pytest_cache*
 htmlcov/*
+static/js/*
 
 # specific files
-config.ini
-users.ini
-trello_lists.ini
+config/config.ini
+config/users.ini
+config/trello_lists.ini
+data/git_treasures.db
 .coverage
 .scannerwork

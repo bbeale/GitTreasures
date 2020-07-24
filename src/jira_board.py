@@ -22,9 +22,9 @@ class JiraBoard:
 
         # Tester credentials import
         if userpath is not None:
-            upath = (os.path.relpath(os.path.join('src', userpath)))
+            upath = (os.path.relpath(os.path.join('config', userpath)))
         else:
-            upath = (os.path.relpath(os.path.join('src', 'users.ini')))
+            upath = (os.path.relpath(os.path.join('config', 'users.ini')))
         self.testers = [t['jira_displayname'] for t in get_configs(['jira_displayname'], upath).values()]
 
         self.host           = config['url']
@@ -509,6 +509,19 @@ class JiraBoard:
             raise JiraBoardException('[!] No current status found')
         return current_status in ['In Progress', 'Backlog']
 
+    def is_defect(self, issue_key):
+        """Return True if Jira issuetype is a defect.
+
+        :param issue_key:
+        :return:
+        """
+        if not issue_key or issue_key is None:
+            raise JiraBoardException('[!] Invalid issue_key')
+
+        return self.get_issue(
+            issue_key,
+            fields='issuetype').fields.issuetype.name.lower() == 'defect'
+
     def get_statuses(self, change_log):
         """Get all status changes from a change_log associated with a Jira story.
 
@@ -609,10 +622,8 @@ class JiraBoard:
         parsed_stories = []
 
         for issue in raw_issues:
-            _story = self.jira.issue(
-                issue.key, fields='summary,description,comment,labels,created,updated,status', expand='changelog'
-            )
-
+            _story              = self.get_issue(issue.key,
+                                                 fields='summary,description,comment,labels,created,updated,status')
             _testedBy           = 'unassigned'
             _hasFailed          = False
             _currentStatus      = self.get_current_status(_story.key)
@@ -656,7 +667,10 @@ class JiraBoard:
                 ), None)
 
                 if _qaDateStatus is None:
-                    # raise JiraBoardException('[!] No QA date found')
+                    if self.is_defect(_story.key):
+                        print('[-] Skipping defect because parent story should exist.')
+                        continue
+
                     print('[!] QA date not found\n\tA developer may have accidentally moved it into QA')
                     _movedToQaDate = dateutil.parser.parse(_story.fields.updated)
                 else:

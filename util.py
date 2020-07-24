@@ -85,7 +85,7 @@ def get_latest_commit(db_path):
     if not os.path.exists(db_path):
         raise FileNotFoundError
 
-    sql = "SELECT commitID, hash, committerDate FROM commits ORDER BY committerDate DESC"
+    sql = "SELECT commitID, hash, committerDate, author_name, commitMessage FROM commits ORDER BY committerDate DESC"
 
     try:
         conn = sqlite3.connect(db_path)

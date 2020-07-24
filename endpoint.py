@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from flask import Flask, redirect, render_template
-from util import get_latest_commit_hash
+from util import get_latest_commit
+from argparse import ArgumentParser, ArgumentError
 import git_treasures
 import configparser
 import sqlite3
@@ -10,8 +11,38 @@ import os
 
 config = configparser.ConfigParser()
 
+
+def parse_args():
+    parser = ArgumentParser()
+    try:
+        parser.add_argument(
+            '-d', '--dev',
+            action='store_true',
+            required=False,
+            help='Run the development version of the script')
+        parser.add_argument(
+            '-tr', '--testrail',
+            action='store_true',
+            required=False,
+            help='If true, will reconcile TestRail after Trello is complete.')
+        parser.add_argument(
+            '-r', '--results',
+            action='store_true',
+            required=False,
+            help='If true, will run test results mode.')
+        parser.add_argument(
+            '-p', '--persist',
+            action='store_true',
+            required=False,
+            help='If true, will only persist TestRail results.')
+    except ArgumentError as err:
+        raise err
+    else:
+        return parser.parse_args()
+
+
 try:
-    config.read(os.path.relpath("config.ini"))
+    config.read(os.path.join('config', 'config.ini'))
 except OSError as e:
     print(e, "Cannot get settings from config file")
     sys.exit(1)
@@ -22,6 +53,7 @@ db_path = os.path.join(
     "git_treasures.db"
 )
 
+
 app = Flask(__name__)
 app.secret_key = config["flask"]["secret_key"]
 
@@ -30,13 +62,13 @@ app.secret_key = config["flask"]["secret_key"]
 @app.route("/index.html")
 def home():
 
-    commit = get_latest_commit_hash(db_path)
+    commit = get_latest_commit(db_path)
 
     commit_data = dict(
-        date    = commit[0],
+        date    = commit[2],
         hash    = commit[1],
-        author  = commit[2],
-        message = commit[3]
+        author  = commit[3],
+        message = commit[4]
     )
 
     return render_template("index.html", commit_data=commit_data)
@@ -44,24 +76,35 @@ def home():
 
 @app.route("/git_treasures")
 def hit_endpoint():
-
-    git_treasures.main()
+    args = parse_args()
+    git_treasures.main(args)
 
     return redirect("index.html", code=302)
 
 
 @app.route("/git_treasures_dev")
 def hit_test_endpoint():
-
-    git_treasures.dev()
+    args = parse_args()
+    args.dev = True
+    git_treasures.main(args)
 
     return redirect("index.html", code=302)
 
 
 @app.route("/git_treasures_testrail")
 def hit_testrail_endpoint():
+    args = parse_args()
+    args.testrail = True
+    git_treasures.main(args)
 
-    git_treasures.testrail_main()
+    return redirect("index.html", code=302)
+
+
+@app.route("/git_treasures_testrail_dev")
+def hit_testrail_test_endpoint():
+    args = parse_args()
+    args.testrail = True
+    git_treasures.main(args)
 
     return redirect("index.html", code=302)
 
