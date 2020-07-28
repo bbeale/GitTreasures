@@ -476,7 +476,7 @@ class TestRailReconciler:
                 # assume it didn't actually fail (for now)
                 continue
 
-            # get the AMB number
+            # get the Jira key
             test = self.testrail.get_test_run_test(f['test_id'])
             case = self.testrail.get_test_case(test['case_id'])
             section = self.testrail.get_section(case['section_id'])

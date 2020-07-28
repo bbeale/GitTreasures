@@ -189,7 +189,7 @@ class TestRail:
             raise TestRailException("[!] Name field is required")
 
         try:
-            result = self.yak.section.add_sprint_section(project_id, dict(name=name))
+            result = self.yak.section.add_section(project_id, dict(name=name))
         except TestRailException as error:
             raise error
         else:
@@ -226,7 +226,7 @@ class TestRail:
             raise TestRailException("[!] Description field is required")
 
         try:
-            result = self.yak.section.add_story_section(project_id, parent_id, dict(name=name, description=description))
+            result = self.yak.section.add_child_section(project_id, parent_id, dict(name=name, description=description))
         except TestRailException as error:
             raise error
         else:
@@ -248,7 +248,7 @@ class TestRail:
             raise TestRailException("[!] project_id must be > 0")
 
         try:
-            result = self.yak.test_suite.get_test_suites(project_id)
+            result = self.yak.suite.get_test_suites(project_id)
         except TestRailException as error:
             raise error
         else:
@@ -270,7 +270,7 @@ class TestRail:
             raise TestRailException("[!] suite_id must be > 0")
 
         try:
-            result = self.yak.test_suite.get_test_suite(suite_id)
+            result = self.yak.suite.get_test_suite(suite_id)
         except TestRailException as error:
             raise error
         else:
@@ -302,7 +302,7 @@ class TestRail:
         suite_data = dict(name=name, description=description)
 
         try:
-            result = self.yak.test_suite.add_test_suite(project_id, suite_data)
+            result = self.yak.suite.add_test_suite(project_id, suite_data)
         except TestRailException as error:
             raise error
         else:
@@ -324,7 +324,7 @@ class TestRail:
             raise TestRailException("[!] project_id must be > 0")
 
         try:
-            result = self.yak.test_case.get_test_cases(project_id)
+            result = self.yak.case.get_test_cases(project_id)
         except TestRailException as error:
             raise error
         else:
@@ -346,7 +346,7 @@ class TestRail:
             raise TestRailException("[!] case_id must be > 0")
 
         try:
-            result = self.yak.test_case.get_test_case(case_id)
+            result = self.yak.case.get_test_case(case_id)
         except TestRailException as error:
             raise error
         else:
@@ -384,8 +384,7 @@ class TestRail:
         if not title or title is None:
             raise TestRailException("[!] Test case title required.")
 
-        data = dict()
-
+        data = {'title': title}
         # validate the optional args
         if type_id is not None:
             if type(type_id) != int:
@@ -422,7 +421,7 @@ class TestRail:
             data["refs"] = refs
 
         try:
-            result = self.yak.test_case.add_test_case(section_id, title, data)
+            result = self.yak.case.add_test_case(section_id, data)
         except TestRailException as error:
             raise error
         else:
@@ -444,7 +443,7 @@ class TestRail:
             raise TestRailException("[!] project_id must be > 0")
 
         try:
-            result = self.yak.test_run.get_test_runs(project_id)
+            result = self.yak.run.get_test_runs(project_id)
         except TestRailException as error:
             raise error
         else:
@@ -466,7 +465,7 @@ class TestRail:
             raise TestRailException("[!] run_id must be > 0")
 
         try:
-            result = self.yak.test_run.get_test_run(run_id)
+            result = self.yak.run.get_test_run(run_id)
         except TestRailException as error:
             raise error
         else:
@@ -497,8 +496,7 @@ class TestRail:
         if not name or name is None:
             raise TestRailException("[!] Test run name value required.")
 
-        data = dict()
-
+        data = {'name': name}
         # optional args
         if description is not None:
             data["description"] = description
@@ -529,7 +527,7 @@ class TestRail:
             data["refs"] = refs
 
         try:
-            result = self.yak.test_run.add_test_run(project_id, name, data)
+            result = self.yak.run.add_test_run(project_id, data)
         except TestRailException as error:
             raise error
         else:
@@ -595,7 +593,7 @@ class TestRail:
             raise TestRailException("[!] project_id must be > 0")
 
         try:
-            result = self.yak.test_plan.get_test_plans(project_id)
+            result = self.yak.plan.get_test_plans(project_id)
         except TestRailException as error:
             raise error
         else:
@@ -617,17 +615,20 @@ class TestRail:
             raise TestRailException("[!] plan_id must be > 0")
 
         try:
-            result = self.yak.test_plan.get_test_plan(plan_id)
+            result = self.yak.plan.get_test_plan(plan_id)
         except TestRailException as error:
             raise error
         else:
             return result
 
-    def add_test_plan(self, project_id, name):
+    def add_test_plan(self, project_id, name, description=None, milestone_id=None, entries=None):
         """Add a test plan to a project.
 
         :param project_id: ID of the TestRail project
         :param name: title of the test plan
+        :param description: description of the test plan
+        :param milestone_id:
+        :param entries: test plan entries
         :return: response from TestRail API containing the newly created test plan
         """
         if not project_id or project_id is None:
@@ -642,10 +643,23 @@ class TestRail:
         if not name or name is None:
             raise TestRailException("[!] Test plan name value required.")
 
-        # data = dict(name=name, include_all=True)
+        data = {'name': name}
+        # optional args
+        if description is not None:
+            data["description"] = description
+
+        if milestone_id is not None:
+            if type(milestone_id) not in [int, float]:
+                raise TestRailException("[!] milestone_id must be an int or float.")
+            if milestone_id <= 0:
+                raise TestRailException("[!] milestone_id must be > 0.")
+            data["milestone_id"] = milestone_id
+
+        if entries is not None:
+            data["entries"] = entries
 
         try:
-            result = self.yak.test_plan.add_test_plan(project_id, name)
+            result = self.yak.plan.add_test_plan(project_id, data)
         except TestRailException as error:
             raise error
         else:
@@ -667,7 +681,7 @@ class TestRail:
             raise TestRailException("[!] test_id must be > 0")
 
         try:
-            result = self.yak.test_result.get_test_results(test_id)
+            result = self.yak.result.get_test_results(test_id)
         except TestRailException as error:
             raise error
         else:
@@ -699,7 +713,7 @@ class TestRail:
             raise TestRailException("[!] case_id must be > 0")
 
         try:
-            result = self.yak.test_result.get_testcase_test_results(run_id, case_id)
+            result = self.yak.result.get_testcase_test_results(run_id, case_id)
         except TestRailException as error:
             raise error
         else:
@@ -709,7 +723,7 @@ class TestRail:
         """
 
         :param run_id:
-=        :return:
+        :return:
         """
         if not run_id or run_id is None:
             raise TestRailException("[!] Invalid run_id")
@@ -721,7 +735,7 @@ class TestRail:
             raise TestRailException("[!] run_id must be > 0")
 
         try:
-            result = self.yak.test_result.get_testrun_test_results(run_id)
+            result = self.yak.result.get_testrun_test_results(run_id)
         except TestRailException as error:
             raise error
         else:
