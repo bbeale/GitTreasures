@@ -28,9 +28,9 @@
 
                 <p id="instructions">To use this endpoint, click <strong>Live Mode</strong>. To use it in test mode, click <strong>Test Mode</strong>. To use it to populate a regression test suite from Jira stories click <strong>TestRail</strong>.</p>
                 <div class="btn-group">
-                    <a class="btn btn-large btn-danger" href="/git_treasures">Live Mode</a>
-                    <a class="btn btn-large btn-success" href="/git_treasures_dev">Test Mode</a>
-                    <a class="btn btn-large btn-info" href="/git_treasures_testrail">TestRail</a>
+                    <a class="btn btn-large btn-danger gtcontrols" href="/git_treasures">Live Mode</a>
+                    <a class="btn btn-large btn-success gtcontrols" href="/git_treasures_dev">Test Mode</a>
+                    <a class="btn btn-large btn-info gtcontrols" href="/git_treasures_testrail">TestRail</a>
                 </div>
             </div>
         </div>
@@ -56,6 +56,31 @@
                             </tr>
                             <tr>
                                 <td width="200">Hash: </td><td width="800">{{ commit_data["hash"] }} </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <br>
+
+            </div>
+                <div class="card mb-3">
+                <div class="card-header">TestRail Test Results</div>
+                <br>
+
+                <div class="card-body">
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td width="200">Date: </td><td width="800">coming soon</td>
+                            </tr>
+                            <tr>
+                                <td width="200">Test Run: </td><td width="800">coming soon</td>
+                            </tr>
+                            <tr>
+                                <td width="200">Project: </td><td width="800">coming soon</td>
+                            </tr>
+                            <tr>
+                                <td width="200">Status: </td><td width="800">coming soon</td>
                             </tr>
                         </tbody>
                     </table>

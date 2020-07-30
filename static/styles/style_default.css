@@ -2,3 +2,7 @@
 #instructions {
     font-size: 1em;
 }
+
+.gtcontrols {
+    min-width: 10vw;
+}

@@ -131,93 +131,56 @@ class TestRailReconciler:
         return self.jira.for_qa_team(key)
 
     # TestRail methods
-    def _testrail_suite_exists(self, jira_key, project_id):
+    def _testrail_suite_exists(self, jira_key: str, project_id: int) -> bool:
         """Check the existence of a test suite in TestRail (before adding a new one).
 
         :param jira_key:
         :param project_id:
         :return boolean: True if the test suite exists, False if not
         """
-        if not jira_key or jira_key is None:
-            raise TestRailReconcilerException('[!] Invalid jira_key')
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
-
         test_suites = self.testrail.get_test_suites(project_id)
         test_suite  = next(filter(lambda s: jira_key.lower() in s['name'].lower(), test_suites), None)
         return True if test_suite is not None else False
 
-    def get_testrail_project(self, name):
+    def get_testrail_project(self, name: str) -> dict:
         """Get a project from TestRail by name.
 
         :param name:
         :return: the 'name' field of a TestRail project if it exists, otherwise None
         """
-        if not name or name is None:
-            raise TestRailReconcilerException('[!] Invalid project name')
         return next(filter(lambda p: p['name'] == name, self.testrail.get_projects()), None)
 
-    def get_testrail_sections(self, project_id):
+    def get_testrail_sections(self, project_id: int) -> list:
         """Get test sections attached to a TestRail project_id.
 
         :param project_id:
         :return:
         """
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
-
-        if type(project_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] project_id must be an int or float')
-
-        if project_id <= 0:
-            raise TestRailReconcilerException('[!] project_id must be > 0')
-
         return self.testrail.get_sections(project_id)
 
-    def get_testrail_section(self, section_id):
+    def get_testrail_section(self, section_id: int) -> dict:
         """Get a test section.
 
         :param section_id:
         :return:
         """
-        if not section_id or section_id is None:
-            raise TestRailReconcilerException('[!] Invalid section_id')
-
-        if type(section_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] section_id must be an int or float')
-
-        if section_id <= 0:
-            raise TestRailReconcilerException('[!] section_id must be > 0')
-
         return self.testrail.get_section(section_id)
 
-    def get_testrail_testruns(self, project_id):
+    def get_testrail_testruns(self, project_id: int) -> list:
         """Get test runs attached to a TestRail project_id.
 
         :param project_id:
         :return:
         """
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
-
-        if type(project_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] project_id must be an int or float')
-
-        if project_id <= 0:
-            raise TestRailReconcilerException('[!] project_id must be > 0')
-
         return self.testrail.get_test_runs(project_id)
 
-    def populate_testrail_sections(self, project_id, jira_stories):
+    def populate_testrail_sections(self, project_id: int, jira_stories: list) -> list:
         """Populate test case 'sections' (or suites?) from each Jira item
 
         :param project_id: TestRail project_id
         :param jira_stories: Jira stories to add to TestRail
         :return list: list of items to add to TestRail
         """
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
-
         sections = []
         for js in jira_stories:
             data = dict(
@@ -229,63 +192,34 @@ class TestRailReconciler:
             sections.append(data)
         return sections
 
-    def add_testrail_sprint(self, project_id, name):
+    def add_testrail_sprint(self, project_id: int, name: str) -> dict:
         """Add a TestRail section representing a 2 week sprint within a release.
 
         :param project_id:
         :param name:
         :return:
         """
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
-
-        if type(project_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] project_id must be an int or float')
-
-        if project_id <= 0:
-            raise TestRailReconcilerException('[!] project_id must be > 0')
-
-        if not name or name is None:
-            raise TestRailReconcilerException('[!] name is required.')
-
         return self.testrail.add_sprint_section(project_id, name)
 
-    def add_testrail_story(self, project_id, name, parent_id, description):
+    def add_testrail_story(self, project_id: int, name: str, parent_id: int) -> dict:
         """Same as add_testrail_sprint but adds a sprint section with a sprint section id as its parent_id.
 
         :param project_id:
         :param parent_id:
         :param name:
-        :param description:
         :return:
         """
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
+        return self.testrail.add_story_section(project_id, name, parent_id)
 
-        if type(project_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] project_id must be an int or float')
-
-        if project_id <= 0:
-            raise TestRailReconcilerException('[!] project_id must be > 0')
-
-        if not name or name is None:
-            raise TestRailReconcilerException('[!] name is required.')
-
-        if not description or description is None:
-            raise TestRailReconcilerException('[!] description is required.')
-
-        if not parent_id or parent_id is None:
-            raise TestRailReconcilerException('[!] Invalid parent_id')
-
-        if type(parent_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] parent_id must be an int or float')
-
-        if parent_id <= 0:
-            raise TestRailReconcilerException('[!] parent_id must be > 0')
-
-        return self.testrail.add_story_section(project_id, name, parent_id, description)
-
-    def add_testrail_testcase(self, story_section_id, title, type_id=9, template_id=2, priority_id=None, estimate=None, milestone_id=None, refs=None):
+    def add_testrail_testcase(self,
+                              story_section_id: int,
+                              title: str,
+                              type_id: int = 9,
+                              template_id: int = 2,
+                              priority_id: int = None,
+                              estimate: str = None,
+                              milestone_id: int = None,
+                              refs: str = None) -> dict:
         """Add a test case to the project.
 
         :param story_section_id:
@@ -298,41 +232,36 @@ class TestRailReconciler:
         :param refs:
         :return:
         """
-        if not story_section_id or story_section_id is None:
-            raise TestRailReconcilerException('[!] Need a section_id for a story to add a test case.')
-
-        if type(story_section_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] story_section_id must be an int or float')
-
-        if story_section_id <= 0:
-            raise TestRailReconcilerException('[!] story_section_id must be > 0')
-
-        if not title or title is None:
-            raise TestRailReconcilerException('[!] A valid title is required.')
-
-        data = dict()
-
-        if type_id is not None and type(type_id) == int and type_id > 0:
+        data = {}
+        if type_id is not None and type_id > 0:
             data['type_id'] = type_id
 
-        if template_id is not None and type(template_id) == int and template_id > 0:
+        if template_id is not None and template_id > 0:
             data['template_id'] = template_id
 
-        if priority_id is not None and type(priority_id) == int and priority_id > 0:
+        if priority_id is not None and priority_id > 0:
             data['priority_id'] = priority_id
 
-        if estimate is not None and type(estimate) == str and estimate != '':
+        if estimate is not None and estimate != '':
             data['estimate'] = estimate
 
-        if milestone_id is not None and type(milestone_id) == int and milestone_id > 0:
+        if milestone_id is not None and milestone_id > 0:
             data['milestone_id'] = milestone_id
 
-        if refs is not None and type(refs) == str and refs != '':
+        if refs is not None and refs != '':
             data['refs'] = refs
 
         return self.testrail.add_test_case(story_section_id, title, **data)
 
-    def add_testrail_testrun(self, project_id, name, description=None, milestone_id=None, assignedto_id=None, include_all=None, case_ids=None, refs=None):
+    def add_testrail_testrun(self,
+                             project_id: int,
+                             name: str,
+                             description: str = None,
+                             milestone_id: int = None,
+                             assignedto_id: int = None,
+                             include_all: bool = None,
+                             case_ids: list = None,
+                             refs: str = None) -> dict:
         """Add a new test run to the project.
 
         :param project_id:
@@ -345,27 +274,14 @@ class TestRailReconciler:
         :param refs:
         :return:
         """
-        if not project_id or project_id is None:
-            raise TestRailReconcilerException('[!] Invalid project_id')
-
-        if type(project_id) not in [int, float]:
-            raise TestRailReconcilerException('[!] project_id must be an int or float')
-
-        if project_id <= 0:
-            raise TestRailReconcilerException('[!] project_id must be > 0')
-
-        if not name or name is None:
-            raise TestRailReconcilerException('[!] A valid name is required.')
-
-        data = dict()
-
+        data = {}
         if description is not None:
             data['description'] = description
 
-        if milestone_id is not None and type(milestone_id) == int and milestone_id > 0:
+        if milestone_id is not None and milestone_id > 0:
             data['milestone_id'] = milestone_id
 
-        if assignedto_id is not None and type(assignedto_id) == int and assignedto_id > 0:
+        if assignedto_id is not None and assignedto_id > 0:
             data['assignedto_id'] = assignedto_id
 
         if include_all is not None:
@@ -424,7 +340,7 @@ class TestRailReconciler:
             in_sprint = True if next(filter(lambda s: story['jira_key'] in s, sprint_story_names), None) is not None else False
 
             if not in_release and not in_sprint:
-                new_story_section = self.add_testrail_story(self.testrail_project['id'], name=story['name'], parent_id=current_sprint['id'], description=story['announcement'])
+                new_story_section = self.add_testrail_story(self.testrail_project['id'], name=story['name'], parent_id=current_sprint['id'])
                 self.add_testrail_testcase(new_story_section['id'], title='Placeholder (change my title when you are ready to write me)', refs=story['jira_key'])
             else:
                 continue
@@ -446,7 +362,7 @@ class TestRailReconciler:
             print('[+] No new test failures found.')
             return None
         else:
-            self.test_results = self.testrail.get_test_results_by_testrun(run_id=run['id'])
+            self.test_results = self.testrail.get_results_for_testrun(run_id=run['id'])
 
         self.failed = [r for r in self.test_results if r['status_id'] == 5]
         self.passed = [r for r in self.test_results if r['status_id'] == 1]
@@ -535,7 +451,7 @@ class TestRailReconciler:
 
         for p in self.passed:
             # get the AMB number
-            test = self.testrail.get_test_run_test(p['test_id'])
+            test = self.testrail.get_test(p['test_id'])
             case = self.testrail.get_test_case(test['case_id'])
             section = self.testrail.get_section(case['section_id'])
             jira_story = section['name']
