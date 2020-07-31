@@ -8,7 +8,7 @@ import json, sys, os
 config = configparser.ConfigParser()
 
 try:
-    path = os.path.join("../", "config.ini")
+    path = os.path.join("../../", "config.ini")
     config.read(os.path.relpath(path))
 except configparser.Error as e:
     print(e, "Cannot get settings from config file")

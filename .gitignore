@@ -6,11 +6,12 @@ repos/*
 *pytest_cache*
 htmlcov/*
 static/js/*
+data/*
+public/*
 
 # specific files
 config/config.ini
 config/users.ini
 config/trello_lists.ini
-data/git_treasures.db
 .coverage
 .scannerwork

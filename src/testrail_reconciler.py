@@ -340,8 +340,7 @@ class TestRailReconciler:
             in_sprint = True if next(filter(lambda s: story['jira_key'] in s, sprint_story_names), None) is not None else False
 
             if not in_release and not in_sprint:
-                new_story_section = self.add_testrail_story(self.testrail_project['id'], name=story['name'], parent_id=current_sprint['id'])
-                self.add_testrail_testcase(new_story_section['id'], title='Placeholder (change my title when you are ready to write me)', refs=story['jira_key'])
+                self.add_testrail_story(self.testrail_project['id'], name=story['name'], parent_id=current_sprint['id'])
             else:
                 continue
 
@@ -393,7 +392,7 @@ class TestRailReconciler:
                 continue
 
             # get the Jira key
-            test = self.testrail.get_test_run_test(f['test_id'])
+            test = self.testrail.get_test(f['test_id'])
             case = self.testrail.get_test_case(test['case_id'])
             section = self.testrail.get_section(case['section_id'])
             parent_story = section['name']

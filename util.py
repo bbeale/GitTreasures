@@ -8,16 +8,13 @@ import sys
 import os
 
 
-def get_configs(fields, config_path):
+def get_configs(fields: list, config_path: str) -> dict:
     """parse a config.ini file for specific keys
-​
+
     :param fields:
     :param config_path:
     :return res: a dict of values parsed from key-value pairs stored in the .ini file
     """
-    if not fields or fields is None:
-        raise ValueError("List of fields must not be empty")
-
     if not config_path or config_path is None or not os.path.exists(config_path):
         raise FileNotFoundError("Invalid config file")
 
@@ -45,7 +42,7 @@ def get_configs(fields, config_path):
     return res
 
 
-def is_db_init(db_path):
+def is_db_init(db_path: str) -> bool:
     """Get the count of all records in commits table.
     If count is 0, return false. If .db file does not exist, return false. Else, return true.
 
@@ -73,7 +70,7 @@ def is_db_init(db_path):
     return True if result[0] > 0 else False
 
 
-def get_latest_commit(db_path):
+def get_latest_commit(db_path: str) -> tuple:
     """Get the most recent commit saved in the database.
 
     :param db_path: path to the sqlite (.db) file
@@ -100,7 +97,7 @@ def get_latest_commit(db_path):
     return result if result is not None else None
 
 
-def get_latest_commit_hash(db_path):
+def get_latest_commit_hash(db_path: str) -> str:
     """Get the hash of the most recently stored commit
 
     :param db_path:
@@ -116,7 +113,7 @@ def get_latest_commit_hash(db_path):
     return commit[1] if commit is not None else None
 
 
-def get_stored_commits(db_path, test_file=None):
+def get_stored_commits(db_path: str, test_file: str = None) -> list:
     """Get a list of commits from the database.
 
     :param db_path: path to the sqlite (.db) file
@@ -163,7 +160,7 @@ def get_stored_commits(db_path, test_file=None):
     return results
 
 
-def store_commit_data(db_path, values):
+def store_commit_data(db_path: str, values: dict) -> None:
     """Add a new commit record to the database.
 
     :param db_path: path to the sqlite (.db) file
@@ -200,7 +197,7 @@ def store_commit_data(db_path, values):
             print("[!] Hash already exists")
 
 
-def git_db_setup(db_path, ):
+def git_db_setup(db_path: str) -> None:
     """Set up git database the old way."""
     if not db_path or db_path is None:
         raise DbException("Database path required for this operation")
@@ -233,7 +230,7 @@ def git_db_setup(db_path, ):
         sys.exit(-1)
 
 
-def gitlab_db_setup(db_path):
+def gitlab_db_setup(db_path: str) -> None:
     """Set up git database the new way (with GitLabLog)."""
     if not db_path or db_path is None:
         raise DbException("Database path required for this operation")
