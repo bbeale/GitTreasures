@@ -4,15 +4,16 @@ from util import get_configs
 from src.exceptions import JiraBoardException
 from urllib.parse import urljoin
 from jira import JIRA, JIRAError
+from jira.resources import Filter, Project, Board, Sprint, Issue
 import dateutil.parser
 import json
 import os
 import re
 
 
-class JiraBoard:
+class JiraBoard(object):
 
-    def __init__(self, config, userpath=None, testMode=False):
+    def __init__(self, config: dict, userpath: str = None, testMode: bool = False):
         """Initialize JiraBoard with all relevant QA Jira stories.
 
         :param config: Jira configuration settings
@@ -27,30 +28,25 @@ class JiraBoard:
             upath = (os.path.relpath(os.path.join('config', 'users.ini')))
         self.testers = [t['jira_displayname'] for t in get_configs(['jira_displayname'], upath).values()]
 
-        self.host           = config['url']
-        self.username       = config['username']
-        self.password       = config['token']
-        self.project_key    = config['project_key']
-        self.testMode       = testMode
-        self.options        = {'server': self.host}
-        self.jira           = JIRA(self.options, auth=(self.username, self.password))
-        self.board          = self.get_board(self.project_key)
+        self.host = config.get('url')
+        self.username = config.get('username')
+        self.password = config.get('token')
+        self.project_key = config.get('project_key')
+        self.testMode = testMode
+        self.options = {'server': self.host}
+        self.jira = JIRA(self.options, auth=(self.username, self.password))
+        self.board = self.get_board(self.project_key)
         self.current_sprint = self.get_current_sprint(self.board.id)
-        self.raw_issues     = []
-        self.stories        = []
+        self.raw_issues = []
+        self.stories = []
 
-    def add_new_filter(self, filter_name, new_query):
+    def add_new_filter(self, filter_name: str, new_query: str) -> Filter:
         """Add a new JQL filter to the Jira project.
 
         :param filter_name: name for the filter
         :param new_query: filter criteria in the form of a JQL string.
         :return:
         """
-        if not filter_name or filter_name is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-        if not new_query or new_query is None:
-            raise JiraBoardException('[!] Invalid or empty query')
-
         result = None
         try:
             result = self.jira.create_filter(filter_name, jql=new_query)
@@ -63,18 +59,13 @@ class JiraBoard:
         finally:
             return result
 
-    def update_filter(self, filter_id, new_query):
+    def update_filter(self, filter_id: int, new_query: str) -> Filter:
         """Update an existing JQL filter associated with the Jira project.
 
         :param filter_id: id for the filter
         :param new_query: filter criteria in the form of a JQL string.
         :return:
         """
-        if not filter_id or filter_id is None:
-            raise JiraBoardException('[!] Invalid filter_id')
-        if not new_query or new_query is None:
-            raise JiraBoardException('[!] Invalid or empty query')
-
         result = None
         try:
             result = self.jira.update_filter(filter_id, jql=new_query)
@@ -87,7 +78,7 @@ class JiraBoard:
         finally:
             return result
 
-    def get_project(self):
+    def get_project(self) -> Project:
         """Get active Jira project.
 
         :return: JSON object representing entire Jira project, otherwise None
@@ -104,15 +95,12 @@ class JiraBoard:
         finally:
             return next(filter(lambda proj: proj.key.upper() == self.project_key, projects), None)
 
-    def get_board(self, project_key):
+    def get_board(self, project_key: str) -> Board:
         """Get active Jira board given a project_key.
 
         :param project_key: Jira project key
         :return: JSON object representing entire Jira board, otherwise None
         """
-        if not project_key or project_key is None:
-            raise JiraBoardException('[!] Invalid project_key')
-
         boards = None
         try:
             boards = self.jira.boards(project_key)
@@ -125,14 +113,12 @@ class JiraBoard:
         finally:
             return next(filter(lambda board: board.name.lower() == 'medhub development', boards), None)
 
-    def get_current_sprint(self, board_id):
+    def get_current_sprint(self, board_id: int) -> Sprint:
         """Given a board_id, get the current sprint the project is in. Also try and filter out that Moodle shit.
 
         :param board_id: ID for the current Jira board
         :return:
         """
-        if not board_id or board_id is None:
-            raise JiraBoardException('[!] Invalid board_id')
         sprints = None
         try:
             sprints = self.jira.sprints(board_id)
@@ -145,10 +131,7 @@ class JiraBoard:
         finally:
             return next(filter(lambda story: story.state.lower() == 'active' and 'yaks' in story.name.lower(), sprints), None)
 
-    def get_jql_filter(self, filter_id):
-        if not filter_id or filter_id is None:
-            raise JiraBoardException('[!] Invalid filter_id')
-
+    def get_jql_filter(self, filter_id: int) -> Filter:
         j_filter = None
         try:
             j_filter = self.jira.filter(filter_id)
@@ -161,15 +144,12 @@ class JiraBoard:
         finally:
             return j_filter
 
-    def get_issues_from_filter(self, filter_id):
+    def get_issues_from_filter(self, filter_id: int) -> list:
         """Get Jira issues returned by a given JQL filter_id.
 
         :param filter_id: id for the filter
         :return:
         """
-        if not filter_id or filter_id is None:
-            raise JiraBoardException('[!] Invalid filter_id')
-
         jql = self.get_jql_filter(filter_id).jql
         issues = None
         try:
@@ -183,15 +163,12 @@ class JiraBoard:
         finally:
             return issues
 
-    def get_issues(self, filter_id):
+    def get_issues(self, filter_id: int) -> list:
         """Seems weirdly like a dupe of get_issues_from_filter(), but if things are working I don't wanna break it right now..
 
         :param filter_id: id for the filter
         :return:
         """
-        if not filter_id or filter_id is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issues = None
         if self.testMode:
             jsonData = open(os.path.join('testJiraData.json'), 'r', encoding='utf-8')
@@ -207,16 +184,13 @@ class JiraBoard:
                     print('[!] Failed to get issues from Jira filter.'.format(str(JIRAError)))
         return issues
 
-    def get_issue(self, issue_key, fields='status'):
+    def get_issue(self, issue_key: str, fields: str = 'status') -> Issue:
         """Get a Jira story given a key.
 
         :param issue_key: a Jira story key
         :param fields:
         :return:
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields=fields, expand='changelog')
@@ -231,15 +205,12 @@ class JiraBoard:
                 raise JiraBoardException('[!] Unable to retrieve issue {}'.format(issue_key))
             return issue
 
-    def get_current_status(self, issue_key):
+    def get_current_status(self, issue_key: str) -> str or None:
         """Get the current status for a given Jira story.
 
         :param issue_key: a Jira story key
         :return:
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -255,15 +226,12 @@ class JiraBoard:
             else:
                 return None
 
-    def get_current_status_category(self, issue_key):
+    def get_current_status_category(self, issue_key: str) -> str or None:
         """Get the status category for a given Jira story.
 
         :param issue_key: a Jira story key
         :return:
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -279,15 +247,12 @@ class JiraBoard:
             else:
                 return None
 
-    def get_most_recent_status_change(self, issue_key):
+    def get_most_recent_status_change(self, issue_key: str) -> str or None:
         """Get the most recent status change for a Jira story, given it's issue_key.
 
         :param issue_key: a Jira story key
         :return: object representing the most recent status change
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -303,15 +268,12 @@ class JiraBoard:
             else:
                 return None
 
-    def is_hotfix(self, issue_key):
+    def is_hotfix(self, issue_key: str) -> bool:
         """Given am issue_key, check if the story is a hotfix.
 
         :param issue_key: a Jira story key
         :return boolean: True if story is a hotfix, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='labels', expand='changelog')
@@ -327,100 +289,79 @@ class JiraBoard:
             else:
                 return False
 
-    def isAtomic(self, issue_key):
+    def is_atomic(self, issue_key: str) -> bool:
         """Given am issue_key, check if the story is from Atomic Object.
 
         :param issue_key: a Jira story key
         :return boolean: True if story is from Atomic Object, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
         return 'MMDH-' in self.jira.issue(issue_key).key
 
-    def is_in_staging(self, issue_key, stories):
+    def is_in_staging(self, issue_key: str, stories: list) -> bool:
         """Given am issue_key, check if the story is in the staging branch.
 
         :param issue_key: a Jira story key
         :param stories: a list of Jira stories
         :return boolean: True if story is in staging, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-        if stories is None:
-            raise JiraBoardException('[!] List of stories cannot be None')
         in_staging = False
         issue = next(filter(lambda story: story['jira_key'] == issue_key, stories), None)
         if issue is not None:
             in_staging = issue['in_staging']
         return in_staging
 
-    def is_fresh_qa_ready(self, issue_key):
+    def is_fresh_qa_ready(self, issue_key: str) -> bool:
         """Given am issue_key, check if the story is ready for QA for the very first time.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a current status of "Ready for QA Release" and no fail statuses in the past, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         current_status = self.get_current_status(issue_key)
         qa_fail = self.has_failed_qa(issue_key)
         if current_status is None:
             raise JiraBoardException('[!] No current status found')
         return current_status == 'Ready for QA Release' and not qa_fail
 
-    def is_stale_qa_ready(self, issue_key):
+    def is_stale_qa_ready(self, issue_key: str) -> bool:
         """Given am issue_key, check if the story is ready for QA after previously failing testing.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a current status of 'Ready for QA Release' and at least one prior fail status, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         current_status = self.get_current_status(issue_key)
         qa_fail = self.has_failed_qa(issue_key)
         if current_status is None:
             raise JiraBoardException('[!] No current status found')
         return current_status == 'Ready for QA Release' and qa_fail
 
-    def is_in_qa_testing(self, issue_key):
+    def is_in_qa_testing(self, issue_key: str) -> bool:
         """Given am issue_key, check if the story is currently in 'QA Testing'.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a current status of 'QA Testing', otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         current_status = self.get_current_status(issue_key)
         if current_status is None:
             raise JiraBoardException('[!] No current status found')
         return current_status == 'QA Testing'
 
-    def has_complete_status(self, issue_key):
+    def has_complete_status(self, issue_key: str) -> bool:
         """Given am issue_key, check if the story has a 'Complete' status category.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a current status category of 'Done', otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         current_status_category = self.get_current_status_category(issue_key)
         if current_status_category is None:
             raise JiraBoardException('[!] No current status category found')
         return current_status_category == 'Done'
 
-    def for_qa_team(self, issue_key):
+    def for_qa_team(self, issue_key: str) -> bool:
         """Similar to passed_qa but checks if a QA tester moved this at any point to make sure it actually got tested.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a status change with a valid QA tester, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -439,15 +380,12 @@ class JiraBoard:
                 tester = next(filter(lambda s: s['authorName'] in self.testers and 'qa release' in s['fromString'].lower() and 'qa testing' in s['toString'].lower(), statuses), None)
                 return tester is not None
 
-    def passed_qa(self, issue_key):
+    def passed_qa(self, issue_key: str) -> bool:
         """Given an issue_key, check if the story has passed QA.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a passing status with a valid QA tester, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -465,15 +403,12 @@ class JiraBoard:
                 tester = next(filter(lambda s: s['authorName'] in self.testers, statuses), None)
                 return self.has_complete_status(issue.key) and tester is not None
 
-    def has_failed_qa(self, issue_key):
+    def has_failed_qa(self, issue_key: str) -> bool:
         """Given an issue_key, check if the story has failed QA in the past.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a fail status in the past, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -495,41 +430,33 @@ class JiraBoard:
                 ), None)
                 return True if failStatus is not None else False
 
-    def is_currently_failed(self, issue_key):
+    def is_currently_failed(self, issue_key: str) -> bool:
         """Given an issue_key, check if a Jira story currently has a failure status.
 
         :param issue_key: a Jira story key
         :return boolean: True if the story has a current fail status, otherwise False
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         current_status = self.get_current_status(issue_key)
         if current_status is None:
             raise JiraBoardException('[!] No current status found')
         return current_status in ['In Progress', 'Backlog']
 
-    def is_defect(self, issue_key):
+    def is_defect(self, issue_key: str) -> bool:
         """Return True if Jira issuetype is a defect.
 
         :param issue_key:
         :return:
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         return self.get_issue(
             issue_key,
             fields='issuetype').fields.issuetype.name.lower() == 'defect'
 
-    def get_statuses(self, change_log):
+    def get_statuses(self, change_log: dict) -> list:
         """Get all status changes from a change_log associated with a Jira story.
 
         :param change_log: expanded list of fields returned from Jira API for a single issue
         :return list: a list of dicts representing the status change and it's author
         """
-        if not change_log or change_log is None:
-            raise JiraBoardException('[!] change_log cannot be None')
         return [dict(
             authorName  = ch.author.displayName,
             created     = ch.created,
@@ -537,15 +464,12 @@ class JiraBoard:
             toString    = ch.items[0].toString
         ) for ch in change_log if ch.items[0].field.lower() == 'status']
 
-    def get_subtasks(self, issue_key):
+    def get_subtasks(self, issue_key: str) -> list:
         """Get subtasks of a Jira story.
 
         :param issue_key: a Jira story key
         :return list: a list of subtask names
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='status', expand='changelog')
@@ -561,15 +485,12 @@ class JiraBoard:
             else:
                 return [task.lower() for task in issue.fields.subtasks]
 
-    def get_attachments(self, issue_key):
+    def get_attachments(self, issue_key: str) -> list:
         """Get attachments from a Jira story.
 
         :param issue_key: a Jira story key
         :return list: a list of URLs pointing to story attachments
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='attachment', expand='changelog')
@@ -585,15 +506,12 @@ class JiraBoard:
             else:
                 return ['{}secure/attachment/{}/{}'.format(self.host, a.id, a.filename) for a in issue.fields.attachment]
 
-    def get_labels(self, issue_key):
+    def get_labels(self, issue_key: str) -> list:
         """Get a list of labels attached to a story by issue_key.
 
         :param issue_key: a Jira story key
         :return list: a list Jira story labels
         """
-        if not issue_key or issue_key is None:
-            raise JiraBoardException('[!] Invalid issue_key')
-
         issue = None
         try:
             issue = self.jira.issue(issue_key, fields='labels', expand='changelog')
@@ -609,16 +527,13 @@ class JiraBoard:
             else:
                 return [label.lower() for label in issue.fields.labels]
 
-    def get_parsed_stories(self, raw_issues, testrail_mode=False):
+    def get_parsed_stories(self, raw_issues: list, testrail_mode: bool = False) -> list:
         """Given a collection of raw Jira stories, parses them down to JSON objects containing needed fields only.
 
         :param raw_issues: JSON collection of stories returned from the Jira API
         :param testrail_mode: Should QA dates be ignored? If they're in the release but haven't been QAed yet... yes.
         :return parsed_stories: a list of parsed stories ready for one of the reconcile methods
         """
-        if raw_issues is None:
-            raise JiraBoardException('[!] List of raw Jira stories cannot be None')
-
         parsed_stories = []
 
         for issue in raw_issues:

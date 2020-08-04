@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from util import store_commit_data, get_latest_commit, get_stored_commits
-from src.exceptions import GitLabLogException
 from datetime import datetime, timedelta
 import sqlite3
-import gitlab
+from gitlab import Gitlab
 import sys
 import re
 
 
-class GitLabLog:
+class GitLabLog(object):
 
-    def __init__(self, config, testMode=False):
+    def __init__(self, config: dict, testMode: bool = False):
         """Initialize the GitLabLog object.
 
         Very similar to GitLog, except using GitLab instead of on-premise git instance.
@@ -21,24 +20,24 @@ class GitLabLog:
         """
         print('[+] Initializing GitLabLog')
 
-        self.testMode               = testMode
-        self.repoPath               = config['repo_path']
-        self.repoToken              = config['token']
-        self.project_id             = config['project_id']
-        self.branch                 = config['staging_branch_name']
-        self.dbPath                 = config['db_path']
-        self.jira_pattern           = re.compile(config['jira_pattern'])
-        self.today                  = datetime.today()
-        self.startDate              = datetime.today() - timedelta(days=30)
-        self.lastCommit             = None
-        self.branches               = []
-        self.commits                = []
-        self.query_params           = dict(
-            ref_name                = self.branch,
-            with_stats              = True
-        )
+        self.testMode = testMode
+        self.repoPath = config.get('repo_path')
+        self.repoToken = config.get('token')
+        self.project_id = config.get('project_id')
+        self.branch = config.get('staging_branch_name')
+        self.dbPath = config.get('db_path')
+        self.jira_pattern = re.compile(config.get('jira_pattern'))
+        self.today = datetime.today()
+        self.startDate = datetime.today() - timedelta(days=30)
+        self.lastCommit = None
+        self.branches = []
+        self.commits = []
+        self.query_params = {
+            "ref_name": self.branch,
+            "with_stats": True
+        }
 
-    def store_new_commits(self, repopath, token, project_id, query_params):
+    def store_new_commits(self, repopath: str, token: str, project_id: int, query_params: dict) -> list:
         """Store commit data pulled from GitLab API into the sqlite database.
 
         :param repopath: location of the repo, either a path or a URL depending on CLI args.
@@ -47,20 +46,11 @@ class GitLabLog:
         :param query_params: GitLab query parameters
         :return:
         """
-        if not repopath or repopath is None:
-            raise GitLabLogException('[!] Invalid repository path')
-        if not token or token is None:
-            raise GitLabLogException('[!] Invalid API token')
-        if not project_id or project_id is None:
-            raise GitLabLogException('[!] Invalid project_id')
-        if not query_params or query_params is None:
-            raise GitLabLogException('[!] Invalid query_params')
-
         print('[+] Analyzing commit data from GitLab')
-        with gitlab.Gitlab(repopath, private_token=token) as gl:
+        with Gitlab(repopath, private_token=token) as gl:
             gl.auth()
-            gl_project              = gl.projects.get(project_id)
-            commits                 = sorted(gl_project.commits.list(
+            gl_project = gl.projects.get(project_id)
+            commits = sorted(gl_project.commits.list(
                 all=True,
                 query_parameters=query_params),
                 key=lambda c: c.attributes['committed_date']
