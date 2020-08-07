@@ -308,7 +308,7 @@ class TestRail:
                      assignedto_id: int = None,
                      include_all: bool = None,
                      case_ids: list = None,
-                     refs: str = None):
+                     refs: str = None) -> dict:
         """Add a test run to a project.
 
         :param project_id: ID of the TestRail project
