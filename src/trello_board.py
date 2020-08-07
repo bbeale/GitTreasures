@@ -354,8 +354,7 @@ class TrelloBoard:
         try:
             new_label = self.trello.cards.new_label(card_id_or_shortlink=card_id, name=name, color=color)
         except HTTPError as httpe:
-            print(httpe.response.status_code, '- Unable to add card label.')
-            raise TrelloBoardException
+            print(f'[!] {httpe.response.status_code} - Card label {name} already exists.')
         else:
             return new_label
 
