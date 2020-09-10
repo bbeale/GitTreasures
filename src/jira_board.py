@@ -451,6 +451,16 @@ class JiraBoard(object):
             issue_key,
             fields='issuetype').fields.issuetype.name.lower() == 'defect'
 
+    def is_bug(self, issue_key: str) -> bool:
+        """Return True if Jira issuetype is a bug.
+
+        :param issue_key:
+        :return:
+        """
+        return self.get_issue(
+            issue_key,
+            fields='issuetype').fields.issuetype.name.lower() == 'bug'
+
     def get_statuses(self, change_log: dict) -> list:
         """Get all status changes from a change_log associated with a Jira story.
 

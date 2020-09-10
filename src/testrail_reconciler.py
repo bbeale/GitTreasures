@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from jira.resources import Filter, Project, Board, Sprint
 from src.exceptions import TestRailReconcilerException
+from src.jira_board import JiraBoard
+from src.testrail import TestRail
 from util import get_configs
 import os
 
 
 class TestRailReconciler:
 
-    def __init__(self, testrail, jira, config):
+    def __init__(self, testrail: TestRail, jira: JiraBoard, config: dict) -> None:
         """Initialize the TestRailReconciler object to populate TestRail and Trello with Jira stories in need of regression testing.
 
         :param testrail: instance of TestRail
         :param jira: instance of JiraBoard
         """
-        if not jira or jira is None:
-            raise TestRailReconcilerException('[!] Initialization fail - missing JiraBoard instance')
-
         upath = (os.path.relpath(os.path.join('config', 'users.ini')))
         self.testers = [t for t in get_configs(['jira_displayname', 'trello_id'], upath).values()]
 
@@ -39,7 +39,7 @@ class TestRailReconciler:
         # 2 stage initialization
         self.populate()
 
-    def populate(self):
+    def populate(self) -> None:
         """Seocnd stage of reconciler initialization."""
         self.jira_project = self.get_jira_project()
         self.jira_board = self.get_jira_board()
@@ -57,14 +57,14 @@ class TestRailReconciler:
             self.testrail_testrun_name = '{} Testing'.format(pname)
 
     # Jira methods
-    def get_jira_project(self):
+    def get_jira_project(self) -> Project:
         """Get the current project from JiraBoard instance.
 
         :return: the current project if it exists, None if not
         """
         return self.jira.get_project()
 
-    def get_jira_board(self, key=None):
+    def get_jira_board(self, key: str = None) -> Board:
         """Get the current board from the current project on the instance.
 
         :param key:
@@ -74,60 +74,46 @@ class TestRailReconciler:
             key = self.jira.get_project()
         return self.jira.get_board(key)
 
-    def get_current_jira_sprint(self, board_id):
+    def get_current_jira_sprint(self, board_id: int) -> Sprint:
         """Get the current sprint (and probably some Moodle bullshit becasue they are too incompetent to make their own Jira project...).
 
         :param board_id: board ID of the Jira board
         :return: the current sprint if one exists that matches criteria
         """
-        if not board_id or board_id is None:
-            raise TestRailReconcilerException('[!] Invalid board ID')
         return self.jira.get_current_sprint(board_id)
 
-    def get_jira_stories(self, filter_id):
+    def get_jira_stories(self, filter_id: int) -> list:
         """Get a list of Jira stories given the ID of a JQL filter.
 
         :param filter_id: filter ID of the JQL filter (defined in Jira)
         :return: list of stories returned by the filter
         """
-        if not filter_id or filter_id is None:
-            raise TestRailReconcilerException('[!] Invalid filter ID')
         return self.jira.get_parsed_stories(self.jira.get_issues(filter_id), testrail_mode=True)
 
-    def update_jira_filter(self, filter_id, query):
+    def update_jira_filter(self, filter_id: int, query: str) -> Filter:
         """Update the query used by a JQL filter.
 
         :param filter_id: filter ID of the JQL filter (defined in Jira)
         :param query: new JQL query string
         :return: JSON representation of the filter
         """
-        if not filter_id or filter_id is None:
-            raise TestRailReconcilerException('[!] Invalid filter ID')
-        if not query or query is None:
-            raise TestRailReconcilerException('[!] Invalid query')
         return self.jira.update_filter(filter_id, query)
 
-    def new_jira_filter(self, name, query):
+    def new_jira_filter(self, name: str, query: str) -> Filter:
         """Create a new JQL filter.
 
         :param name: name of the new JQL filter
         :param query: JQL query string
         :return: JSON representation of the filter
         """
-        if not name or name is None:
-            raise TestRailReconcilerException('[!] Invalid name')
-        if not query or query is None:
-            raise TestRailReconcilerException('[!] Invalid query')
         return self.jira.add_new_filter(name, query)
 
-    def is_for_qa(self, key):
+    def is_for_qa(self, key: str) -> bool:
         """Make sure the story is actually one for QA to test.
 
         :param key:
         :return:
         """
-        if not key or key is None:
-            raise TestRailReconcilerException('[!] Invalid key.')
         return self.jira.for_qa_team(key)
 
     # TestRail methods
@@ -295,7 +281,7 @@ class TestRailReconciler:
 
         return self.testrail.add_test_run(project_id, name, **data)
 
-    def populate_release(self):
+    def populate_release(self) -> None:
         """Populate TestRail project and test suites."""
 
         # try to get the current TestRail project
@@ -351,7 +337,7 @@ class TestRailReconciler:
         if not has_testrun:
             self.add_testrail_testrun(self.testrail_project['id'], self.testrail_testrun_name)
 
-    def get_testrun_results(self):
+    def get_testrun_results(self) -> None:
         """Get results from TestRail test run. """
         run = next(filter(lambda tr: tr['name'] == self.testrail_testrun_name, self.get_testrail_testruns(self.testrail_project['id'])), None)
         if run is None:
@@ -369,7 +355,7 @@ class TestRailReconciler:
         self.jira_staging_transitions(run)
         print('[+] Added defect subtask(s) to Jira.')
 
-    def add_defects_to_jira(self, test_run: dict):
+    def add_defects_to_jira(self, test_run: dict) -> None:
         """Add subtasks to Jira for any failures.
 
         TODO, since we are officially using subtasks
@@ -435,11 +421,11 @@ class TestRailReconciler:
             # add the subtask to Jira
             self.jira.jira.create_issue(fields=fields)
 
-    def complete_jira_subtask(self, jira_story: str):
+    def complete_jira_subtask(self, jira_story: str) -> None:
         """ TODO """
         raise NotImplementedError
 
-    def jira_staging_transitions(self, test_run):
+    def jira_staging_transitions(self, test_run) -> None:
         """Transition Jira stories to 'Ready for Staging Release' when all tests pass.
 
         :param test_run:
