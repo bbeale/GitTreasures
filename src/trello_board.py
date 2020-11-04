@@ -9,7 +9,7 @@ import sys
 import os
 
 
-class TrelloBoard:
+class TrelloBoard(object):
 
     def __init__(self, config: dict, testMode: bool  = False) -> None:
         """Initialize TrelloBoard object.

@@ -14,7 +14,7 @@ from testrail_yak.test import TestException
 from testrail_yak.user import UserException
 
 
-class TestRail:
+class TestRail(object):
     """Interface with the TestRail API.
 
        Data grabbed here and methods defined here will be used in TestRailReconciler.

@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from flask import Flask, redirect, render_template
-from util import get_latest_commit
+from src.gitlab_log import GitLabLog as GL
 from argparse import ArgumentParser, ArgumentError
 import git_treasures
 import configparser
-import sqlite3
 import sys
 import os
 
@@ -62,7 +61,7 @@ app.secret_key = config["flask"]["secret_key"]
 @app.route("/index.html")
 def home():
 
-    commit = get_latest_commit(db_path)
+    commit = GL.get_latest_stored_commit(db_path)
 
     commit_data = dict(
         date    = commit[2],
@@ -109,16 +108,5 @@ def hit_testrail_test_endpoint():
     return redirect("index.html", code=302)
 
 
-def getMostRecentHash():
-
-    connection = sqlite3.connect(os.path.join("data", "git_treasures.db"))
-    cursor = connection.cursor()
-    cursor.execute("SELECT committerDate, hash, author_name, commitMessage FROM commits ORDER BY committerDate DESC")
-    result = cursor.fetchone()
-    connection.close()
-
-    return result
-
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)

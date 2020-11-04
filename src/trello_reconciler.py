@@ -10,7 +10,7 @@ import os
 import re
 
 
-class TrelloReconciler:
+class TrelloReconciler(object):
 
     def __init__(self, jira: JiraBoard, git: GitLabLog, trello: TrelloBoard, config: dict) -> None:
         """Initialize the TrelloReconciler object to reconcile the differences between git, Jira and Trello so that team members working from a Trello project board can adhere to GitFlow while putting development items through QA
@@ -60,6 +60,25 @@ class TrelloReconciler:
         except TrelloReconcilerException:
             raise TrelloReconcilerException
 
+    def reconcile(self) -> None:
+        """Any class named reconciler needs a reconcile method.
+        Steps:
+            1) update the existing Trello cards
+            2) get a list of the existing card names
+            3) move 'Complete' cards to archive board if list length >= 10
+            4) create list of new Trello cards to make
+            5) add the new Trello cards from the new card list to the board
+        """
+        self.trello_updateCurrentCards()
+        self._old_card_names = self.trello_getOldLists()
+        self.trello_archiveComplete()
+        self.trello_setNewLists(self.jira_qa_statuses)
+        self.new_cards = sorted(self.new_cards, key=lambda c: c['date'])
+        self.trello_addCardsToBoard()
+
+        # Or maybe the list sorting should happen here?
+        # self.trello_sort_lists()
+
     # Trello methods
     def trello_getOldFailed(self) -> dict:
         """Get a list of pre-reconcile Trello cards currently in the 'Failed' list.
@@ -95,6 +114,24 @@ class TrelloReconciler:
         :return list: Trello cards in the 'Complete' list
         """
         return self.trello.get_cards_from_list(self.complete_listID)
+
+    def trello_getOldLists(self) -> list:
+        """Generate a list of previously existing cards before reconciling.
+
+        This list will be used to check if incoming Jira stories have already made it into the Trello QA process.
+
+        :return list: a list of card names that were on the board prior to reconciling
+        """
+        self.old_qa_ready_cards = self.trello_getOldTodo()
+
+        to_names        = [s.get('name') for s in self.old_qa_ready_cards]
+        f_names         = [f.get('name') for f in self.trello_getOldFailed()]
+        op_names        = [h.get('name') for h in self.trello_getOldOtherPriorities()]
+        te_names        = [o.get('name') for o in self.trello_getOldTesting()]
+        complete_names  = [c.get('name') for c in self.trello_getOldComplete()]
+
+        return list(
+            set(f_names + op_names + to_names + te_names + complete_names))
 
     def trello_addCardLabel(self, card_id: str, label: str, color: str = None) -> dict:
         """Add an individual label to a Trello card given its card_id.
@@ -269,24 +306,6 @@ class TrelloReconciler:
             if self.trello_isInQaTesting(card):
                 self.trello_copyCard(card, self.testing_listID)
                 continue
-
-    def trello_getOldLists(self) -> list:
-        """Generate a list of previously existing cards before reconciling.
-
-        This list will be used to check if incoming Jira stories have already made it into the Trello QA process.
-
-        :return list: a list of card names that were on the board prior to reconciling
-        """
-        self.old_qa_ready_cards = self.trello_getOldTodo()
-
-        to_names        = [s.get('name') for s in self.old_qa_ready_cards]
-        f_names         = [f.get('name') for f in self.trello_getOldFailed()]
-        op_names        = [h.get('name') for h in self.trello_getOldOtherPriorities()]
-        te_names        = [o.get('name') for o in self.trello_getOldTesting()]
-        complete_names  = [c.get('name') for c in self.trello_getOldComplete()]
-
-        return list(
-            set(f_names + op_names + to_names + te_names + complete_names))
 
     def trello_archiveComplete(self) -> None:
         """If the number of cards in 'Complete' is >= 10, move all cards to the archive board ('QA Complete' on Trello).
@@ -497,6 +516,18 @@ class TrelloReconciler:
                     self.trello_addCardLabels(newcard, card['labels'])
                     self.trello_addCardAttachments(newcard['id'], card['jira_attachments'])
 
+    def trello_sort_lists(self):
+        # pass
+        lists = self.trello.get_trello_lists(self.trello.board_id)
+
+        for list in lists:
+            cards = self.trello.get_cards_from_list(list.get('id'))
+
+            # Get the Jira story
+
+
+            story = self.jira.get_issue()
+
     # Jira methods
     def jira_getStories(self, jira: str, filterID: str) -> list:
         raise NotImplementedError
@@ -621,19 +652,3 @@ class TrelloReconciler:
         """
         issue = self.jira.get_issue(jira_key, 'subtasks')
         return len(issue.fields.subtasks) > 0
-
-    def reconcile(self) -> None:
-        """Any class named reconciler needs a reconcile method.
-        Steps:
-            1) update the existing Trello cards
-            2) get a list of the existing card names
-            3) move 'Complete' cards to archive board if list length >= 10
-            4) create list of new Trello cards to make
-            5) add the new Trello cards from the new card list to the board
-        """
-        self.trello_updateCurrentCards()
-        self._old_card_names = self.trello_getOldLists()
-        self.trello_archiveComplete()
-        self.trello_setNewLists(self.jira_qa_statuses)
-        self.new_cards = sorted(self.new_cards, key=lambda c: c['date'])
-        self.trello_addCardsToBoard()

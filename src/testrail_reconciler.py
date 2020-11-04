@@ -8,7 +8,7 @@ from util import get_configs
 import os
 
 
-class TestRailReconciler:
+class TestRailReconciler(object):
 
     def __init__(self, testrail: TestRail, jira: JiraBoard, config: dict) -> None:
         """Initialize the TestRailReconciler object to populate TestRail and Trello with Jira stories in need of regression testing.
