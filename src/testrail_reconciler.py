@@ -297,6 +297,10 @@ class TestRailReconciler(object):
         # get the sprint sections from the list of sections
         sprint_sections = list(filter(lambda s: s['parent_id'] is None, all_sections))
 
+        # check for current sprint not being defined yet
+        if self.current_jira_sprint is None:
+            raise TestRailReconcilerException('[!] Current sprint not defined in Jira.')
+
         # get the current sprint from Jira based on our project name
         current_sprint = next(filter(lambda s: s['name'] == self.current_jira_sprint.name, sprint_sections), None)
 

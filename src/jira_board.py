@@ -129,7 +129,10 @@ class JiraBoard(object):
             except JIRAError:
                 print('[!] Failed to get Jira sprints.'.format(str(JIRAError)))
         finally:
-            return next(filter(lambda story: story.state.lower() == 'active' and 'yaks' in story.name.lower(), sprints), None)
+            res = next(filter(lambda story: story.state.lower() == 'active' and 'yaks' in story.name.lower(), sprints), None)
+            if res is None:
+                raise JiraBoardException('[!] No current sprint')
+            return res
 
     def get_jql_filter(self, filter_id: int) -> Filter:
         j_filter = None
@@ -451,6 +454,16 @@ class JiraBoard(object):
             issue_key,
             fields='issuetype').fields.issuetype.name.lower() == 'defect'
 
+    def is_qa_task(self, issue_key: str) -> bool:
+        """Return True if Jira issuetype is a defect.
+
+        :param issue_key:
+        :return:
+        """
+        return self.get_issue(
+            issue_key,
+            fields='issuetype').fields.issuetype.name.lower() == 'qa task'
+
     def is_bug(self, issue_key: str) -> bool:
         """Return True if Jira issuetype is a bug.
 
@@ -592,11 +605,11 @@ class JiraBoard(object):
                 ), None)
 
                 if _qaDateStatus is None:
-                    if self.is_defect(_story.key):
-                        print('[-] Skipping defect because parent story should exist.')
+                    if self.is_defect(_story.key) or self.is_qa_task(_story.key):
+                        print(f'[-] Skipping defect {str(issue.key)} because parent story should exist.')
                         continue
 
-                    print('[!] QA date not found\n\tA developer may have accidentally moved it into QA')
+                    print(f'[!] QA date not found on {str(issue.key)}\n\tEither the issue type did not get excluded or a developer may have accidentally moved the story into QA')
                     _movedToQaDate = dateutil.parser.parse(_story.fields.updated)
                 else:
                     _movedToQaDate  = dateutil.parser.parse(_qaDateStatus['created'])

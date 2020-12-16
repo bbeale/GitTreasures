@@ -354,7 +354,11 @@ class TrelloReconciler(object):
                 # don't add a card if it's a defect
                 continue
 
-            if self.jira_isBug(story.get('jira_key')):
+            if self.jira_isQaTask(story.get('jira_key')):
+                # ... or a QA task
+                continue
+
+            if self.jira_isBug(story.get('jira_key')) and 'AMB-' in story.get('jira_key'):
                 self.trello_addToList(story, self.other_listID, top_of_list=True)
                 continue
 
@@ -635,6 +639,14 @@ class TrelloReconciler(object):
         :return:
         """
         return self.jira.is_defect(jira_key)
+
+    def jira_isQaTask(self, jira_key: str) -> bool:
+        """Return True if it is a defect issuetype.
+
+        :param jira_key:
+        :return:
+        """
+        return self.jira.is_qa_task(jira_key)
 
     def jira_isBug(self, jira_key: str) -> bool:
         """Return True if it is a Bug issuetype.
