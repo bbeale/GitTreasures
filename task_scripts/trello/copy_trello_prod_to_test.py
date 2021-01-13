@@ -14,27 +14,9 @@ except OSError as e:
     sys.exit(1)
 
 
-try:
-    # Trello config values
-    trello_config = dict(
-        key                 = config["trello"]["key"],
-        token               = config["trello"]["token"],
-        board_id            = config["trello"]["board_id"],
-        test_board_id       = config["trello"]["test_board_id"],
-        archive_board_id    = config["trello"]["archive_board_id"],
-    )
-except KeyError as KE:
-    print(KE, "Key does not exist")
-    sys.exit(-1)
-
-except configparser.Error as E:
-    print(E, "Failed to get settings from config file")
-    sys.exit(-1)
-
-
 def main():
 
-    trello = TrelloBoard(trello_config, testMode=True)
+    trello = TrelloBoard(config, testMode=True)
 
     copyProdToTest(trello)
 

@@ -103,12 +103,12 @@ class TestUtil(TestCase):
     """
     def test_is_db_init_empty_db_path(self):
         db_path = ""
-        with self.assertRaises(DbException):
+        with self.assertRaises(DbPathException):
             is_db_init(db_path)
 
     def test_is_db_init_none_db_path(self):
         db_path = None
-        with self.assertRaises(DbException):
+        with self.assertRaises(DbPathException):
             is_db_init(db_path)
 
     def test_is_db_init_invalid_db_path(self):
@@ -138,12 +138,12 @@ class TestUtil(TestCase):
     """
     def test_get_latest_commit_empty_path(self):
         dbpath = ""
-        with self.assertRaises(DbException):
+        with self.assertRaises(DbPathException):
             get_latest_commit(dbpath)
 
     def test_get_latest_commit_none_path(self):
         dbpath = None
-        with self.assertRaises(DbException):
+        with self.assertRaises(DbPathException):
             get_latest_commit(dbpath)
 
     def test_get_latest_commit_invalid_path(self):
@@ -173,12 +173,12 @@ class TestUtil(TestCase):
     """
     def test_get_latest_commit_hash_empty_path(self):
         dbpath = ""
-        with self.assertRaises(DbException):
+        with self.assertRaises(DbPathException):
             get_latest_commit_hash(dbpath)
 
     def test_get_latest_commit_hash_none_path(self):
         dbpath = None
-        with self.assertRaises(DbException):
+        with self.assertRaises(DbPathException):
             get_latest_commit_hash(dbpath)
 
     def test_get_latest_commit_hash_invalid_path(self):

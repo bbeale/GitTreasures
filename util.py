@@ -1,11 +1,34 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from argparse import ArgumentParser, ArgumentError
+from configparser import ConfigParser, ParsingError
 from src.exceptions import DbException
-import configparser
-import sqlite3
-import json
+from sqlite3 import connect, Error
 import sys
 import os
+
+
+def get_cli_args() -> ArgumentParser:
+    """Parse CLI args.
+
+    :return: ArgumentParser
+    """
+    parser = ArgumentParser()
+    try:
+        parser.add_argument(
+            '-d', '--dev',
+            action='store_true',
+            required=False,
+            help='Run the development version of the script')
+        parser.add_argument(
+            '-tr', '--testrail',
+            action='store_true',
+            required=False,
+            help='If true, will reconcile TestRail after Trello is complete.')
+    except ArgumentError as err:
+        raise err
+    else:
+        return parser
 
 
 def get_configs(fields: list, config_path: str) -> dict:
@@ -18,13 +41,12 @@ def get_configs(fields: list, config_path: str) -> dict:
     if not config_path or config_path is None or not os.path.exists(config_path):
         raise FileNotFoundError("Invalid config file")
 
-    config = configparser.ConfigParser()
+    config = ConfigParser()
 
     try:
         config.read(config_path)
-    except configparser.Error as cpe:
-        print(cpe, "Failed to parse config file")
-        sys.exit(1)
+    except ParsingError as e:
+        raise e
 
     res = {}
 
@@ -58,14 +80,13 @@ def is_db_init(db_path: str) -> bool:
     sql = "SELECT COUNT(*) FROM commits"
 
     try:
-        conn = sqlite3.connect(db_path)
+        conn = connect(db_path)
         cursor = conn.cursor()
         cursor.execute(sql)
         result = cursor.fetchone()
         conn.close()
-    except sqlite3.Error as sqle:
-        print(sqle, "Database operation failed")
-        sys.exit(-1)
+    except Error as sqle:
+        raise (sqle, "Database operation failed")
 
     return True if result[0] > 0 else False
 
@@ -83,7 +104,7 @@ def git_db_setup(db_path: str) -> None:
     dbpath = os.path.join('data', 'git_treasures.db')
 
     # Let's start making databases!
-    connection = sqlite3.connect(dbpath)
+    connection = connect(dbpath)
     cursor = connection.cursor()
 
     create_tables = "CREATE TABLE IF NOT EXISTS commits (commitID int, hash text, committerDate text, mainBranch text, otherBranches text, author_name text, author_email text, commitMessage text )"
@@ -98,9 +119,8 @@ def git_db_setup(db_path: str) -> None:
         # Should see "commits" table
         tables = cursor.fetchall()
         print(tables)
-    except sqlite3.Error as sqle:
-        print(sqle, "Database initialization failed")
-        sys.exit(-1)
+    except Error as sqle:
+        raise (sqle, "Database operation failed")
 
 
 def gitlab_db_setup(db_path: str) -> None:
@@ -109,7 +129,7 @@ def gitlab_db_setup(db_path: str) -> None:
         raise DbException("Database path required for this operation")
 
     # create the database
-    connection      = sqlite3.connect(db_path)
+    connection      = connect(db_path)
     cursor          = connection.cursor()
 
     create_tables   = "CREATE TABLE IF NOT EXISTS commits (commitID int, hash text, committerDate text, mainBranch text, author_name text, author_email text, commitMessage text )"
@@ -125,27 +145,5 @@ def gitlab_db_setup(db_path: str) -> None:
         tables = cursor.fetchall()
         print(tables)
         connection.close()
-    except sqlite3.Error as sqle:
-        print(sqle, "Database initialization failed")
-        sys.exit(-1)
-
-
-def main():
-    tc = get_configs(["trello_id"], "users.ini")
-    for t in tc.items():
-        print(t)
-
-
-    jc = get_configs(["jira_displayname"], "users.ini")
-    for j in jc.items():
-        print(j)
-
-    trc = get_configs(["jira_displayname", "trello_id"], "users.ini")
-    for tr in trc.items():
-        print(tr)
-
-    print('.')
-
-
-if __name__ == "__main__":
-    main()
+    except Error as sqle:
+        raise (sqle, "Database operation failed")
